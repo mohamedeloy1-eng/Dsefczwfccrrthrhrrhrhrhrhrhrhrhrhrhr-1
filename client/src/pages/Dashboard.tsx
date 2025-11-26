@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import Header from "@/components/Header";
 import StatusCard from "@/components/StatusCard";
 import QRCodeDisplay from "@/components/QRCodeDisplay";
@@ -7,6 +9,8 @@ import ChatView from "@/components/ChatView";
 import SettingsPanel from "@/components/SettingsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Settings, QrCode } from "lucide-react";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -25,79 +29,146 @@ interface Conversation {
   messages: Message[];
 }
 
-// todo: remove mock functionality - replace with real API data
-const mockConversations: Conversation[] = [
-  {
-    id: '1',
-    phoneNumber: '+201234567890',
-    name: 'Ahmed Mohamed',
-    lastMessage: 'Thank you for your help!',
-    timestamp: '2m ago',
-    unreadCount: 2,
-    messages: [
-      { id: '1', content: 'Hello!', isBot: false, timestamp: '10:28 AM' },
-      { id: '2', content: 'Hello! I am GX-MODY, your AI assistant. How can I help you today?', isBot: true, timestamp: '10:28 AM' },
-      { id: '3', content: 'What is the weather like today?', isBot: false, timestamp: '10:29 AM' },
-      { id: '4', content: 'I can help you with many things, but I don\'t have access to real-time weather data. I recommend checking a weather app or website for accurate information about your location.', isBot: true, timestamp: '10:29 AM' },
-      { id: '5', content: 'Thank you for your help!', isBot: false, timestamp: '10:30 AM' },
-    ],
-  },
-  {
-    id: '2',
-    phoneNumber: '+201987654321',
-    name: 'Sara Ali',
-    lastMessage: 'Can you help me with coding?',
-    timestamp: '15m ago',
-    unreadCount: 0,
-    messages: [
-      { id: '1', content: 'Hi, can you help me with coding?', isBot: false, timestamp: '10:15 AM' },
-      { id: '2', content: 'Of course! I\'d be happy to help you with coding. What programming language or specific problem are you working with?', isBot: true, timestamp: '10:15 AM' },
-    ],
-  },
-  {
-    id: '3',
-    phoneNumber: '+201122334455',
-    name: 'Omar Hassan',
-    lastMessage: 'What is AI?',
-    timestamp: '1h ago',
-    unreadCount: 1,
-    messages: [
-      { id: '1', content: 'What is AI?', isBot: false, timestamp: '9:30 AM' },
-      { id: '2', content: 'AI stands for Artificial Intelligence. It refers to computer systems designed to perform tasks that typically require human intelligence, such as learning, problem-solving, understanding language, and recognizing patterns.', isBot: true, timestamp: '9:30 AM' },
-    ],
-  },
-];
+interface BotStatus {
+  isConnected: boolean;
+  isReady: boolean;
+  qrCode: string | null;
+  messagesCount: number;
+  usersCount: number;
+}
+
+interface BotSettings {
+  botName: string;
+  systemPrompt: string;
+  autoReply: boolean;
+}
 
 export default function Dashboard() {
-  const [isConnected, setIsConnected] = useState(true); // todo: remove mock functionality
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>('1');
-  const [conversations] = useState<Conversation[]>(mockConversations); // todo: remove mock functionality
+  const { toast } = useToast();
+  const { subscribe } = useWebSocket();
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<BotStatus | null>(null);
 
+  const { data: status, isLoading: statusLoading } = useQuery<BotStatus>({
+    queryKey: ['/api/status'],
+  });
+
+  const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
+    queryKey: ['/api/conversations'],
+  });
+
+  const { data: settings } = useQuery<BotSettings>({
+    queryKey: ['/api/settings'],
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/connect'),
+    onSuccess: () => {
+      toast({ title: 'Connecting...', description: 'Initializing WhatsApp connection' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to connect', variant: 'destructive' });
+    },
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/disconnect'),
+    onSuccess: () => {
+      toast({ title: 'Disconnected', description: 'WhatsApp disconnected successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/status'] });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to disconnect', variant: 'destructive' });
+    },
+  });
+
+  const refreshQRMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/refresh-qr'),
+    onSuccess: () => {
+      toast({ title: 'Refreshing...', description: 'Generating new QR code' });
+    },
+  });
+
+  const settingsMutation = useMutation({
+    mutationFn: (data: BotSettings) => apiRequest('POST', '/api/settings', data),
+    onSuccess: () => {
+      toast({ title: 'Settings Saved', description: 'Bot settings updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' });
+    },
+  });
+
+  useEffect(() => {
+    const unsubStatus = subscribe('status', (data: BotStatus) => {
+      setLiveStatus(data);
+      if (data.qrCode) {
+        setQrCode(data.qrCode);
+      } else if (data.isConnected) {
+        setQrCode(null);
+      }
+    });
+
+    const unsubQR = subscribe('qr', (data: string) => {
+      setQrCode(data);
+    });
+
+    const unsubMessage = subscribe('message', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+    });
+
+    const unsubStats = subscribe('stats', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status'] });
+    });
+
+    const unsubSettings = subscribe('settings', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
+    });
+
+    return () => {
+      unsubStatus();
+      unsubQR();
+      unsubMessage();
+      unsubStats();
+      unsubSettings();
+    };
+  }, [subscribe]);
+
+  const currentStatus = liveStatus || status;
+  const isConnected = currentStatus?.isReady || false;
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
 
   const handleToggleConnection = () => {
-    setIsConnected(!isConnected);
+    if (isConnected) {
+      disconnectMutation.mutate();
+    } else {
+      connectMutation.mutate();
+    }
   };
 
   const handleRefreshQR = () => {
-    console.log('Refreshing QR code...'); // todo: remove mock functionality
+    refreshQRMutation.mutate();
   };
 
-  const handleSaveSettings = (settings: { botName: string; systemPrompt: string; autoReply: boolean }) => {
-    console.log('Saving settings:', settings); // todo: remove mock functionality
+  const handleSaveSettings = (newSettings: BotSettings) => {
+    settingsMutation.mutate(newSettings);
   };
 
-  // todo: remove mock functionality - calculate from real data
-  const messagesCount = conversations.reduce((acc, c) => acc + c.messages.length, 0);
-  const usersCount = conversations.length;
+  const messagesCount = currentStatus?.messagesCount || 0;
+  const usersCount = currentStatus?.usersCount || 0;
 
   return (
     <div className="min-h-screen bg-background" data-testid="dashboard-page">
-      <Header isConnected={isConnected} onToggleConnection={handleToggleConnection} />
+      <Header 
+        isConnected={isConnected} 
+        onToggleConnection={handleToggleConnection} 
+      />
       
       <main className="container px-4 py-6 space-y-6">
         <StatusCard 
-          status={isConnected ? "connected" : "disconnected"} 
+          status={isConnected ? "connected" : (connectMutation.isPending ? "connecting" : "disconnected")} 
           messagesCount={messagesCount}
           usersCount={usersCount}
         />
@@ -132,7 +203,9 @@ export default function Dashboard() {
                 />
               ) : (
                 <div className="hidden lg:flex items-center justify-center h-[450px] bg-muted/30 rounded-lg">
-                  <p className="text-muted-foreground">Select a conversation to view</p>
+                  <p className="text-muted-foreground">
+                    {conversationsLoading ? 'Loading conversations...' : 'Select a conversation to view'}
+                  </p>
                 </div>
               )}
             </div>
@@ -141,7 +214,7 @@ export default function Dashboard() {
           <TabsContent value="connection" className="mt-6">
             <div className="max-w-md mx-auto">
               <QRCodeDisplay
-                qrCode={null}
+                qrCode={qrCode || currentStatus?.qrCode || null}
                 isConnected={isConnected}
                 onRefresh={handleRefreshQR}
               />
@@ -151,9 +224,9 @@ export default function Dashboard() {
           <TabsContent value="settings" className="mt-6">
             <div className="max-w-lg mx-auto">
               <SettingsPanel
-                botName="GX-MODY"
-                systemPrompt="You are GX-MODY, a helpful and friendly AI assistant. Answer questions clearly and concisely. Always be polite and helpful."
-                autoReply={true}
+                botName={settings?.botName || "GX-MODY"}
+                systemPrompt={settings?.systemPrompt || "You are GX-MODY, a helpful and friendly AI assistant."}
+                autoReply={settings?.autoReply ?? true}
                 onSave={handleSaveSettings}
               />
             </div>
