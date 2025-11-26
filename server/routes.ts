@@ -138,6 +138,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/repair', async (req, res) => {
+    try {
+      const result = await whatsappService.repair();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: error?.message || 'Failed to repair',
+        diagnostics: null 
+      });
+    }
+  });
+
   app.get('/api/conversations', (req, res) => {
     const conversations = conversationStore.getAllConversations();
     res.json(conversations);

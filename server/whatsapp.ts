@@ -46,6 +46,7 @@ class WhatsAppService extends EventEmitter {
       }),
       puppeteer: {
         headless: true,
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -55,6 +56,10 @@ class WhatsAppService extends EventEmitter {
           '--no-zygote',
           '--single-process',
           '--disable-gpu',
+          '--disable-extensions',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
         ],
       },
     });
@@ -170,6 +175,9 @@ class WhatsAppService extends EventEmitter {
     if (this.client) {
       try {
         await this.client.destroy();
+      } catch (err) {
+        console.error('Error disconnecting WhatsApp client:', err);
+      } finally {
         this.client = null;
         this.status = {
           isConnected: false,
@@ -177,8 +185,6 @@ class WhatsAppService extends EventEmitter {
           qrCode: null,
         };
         this.emit('status', this.status);
-      } catch (err) {
-        console.error('Error disconnecting WhatsApp client:', err);
       }
     }
   }
@@ -191,6 +197,56 @@ class WhatsAppService extends EventEmitter {
     
     await this.disconnect();
     await this.initialize();
+  }
+
+  async repair(): Promise<{ success: boolean; message: string; diagnostics: any }> {
+    const diagnostics: any = {
+      timestamp: new Date().toISOString(),
+      status: { ...this.status },
+      checks: [],
+      actions: [],
+    };
+
+    try {
+      diagnostics.checks.push({ name: 'Client Status', result: this.client ? 'Exists' : 'Null' });
+      diagnostics.checks.push({ name: 'Connection', result: this.status.isConnected ? 'Connected' : 'Disconnected' });
+      diagnostics.checks.push({ name: 'Ready', result: this.status.isReady ? 'Ready' : 'Not Ready' });
+
+      if (this.client && !this.status.isConnected) {
+        diagnostics.actions.push('Destroying stale client');
+        try {
+          await this.client.destroy();
+        } catch (e) {
+          diagnostics.actions.push('Client destroy failed (expected if already dead)');
+        }
+        this.client = null;
+      }
+
+      diagnostics.actions.push('Resetting status');
+      this.status = {
+        isConnected: false,
+        isReady: false,
+        qrCode: null,
+      };
+      this.emit('status', this.status);
+
+      diagnostics.actions.push('Reinitializing WhatsApp client');
+      await this.initialize();
+
+      diagnostics.actions.push('Repair completed successfully');
+      return {
+        success: true,
+        message: 'تم إصلاح الاتصال بنجاح - Repair completed successfully',
+        diagnostics,
+      };
+    } catch (error: any) {
+      diagnostics.actions.push(`Error during repair: ${error?.message || 'Unknown error'}`);
+      return {
+        success: false,
+        message: `فشل الإصلاح: ${error?.message || 'Unknown error'}`,
+        diagnostics,
+      };
+    }
   }
 }
 
