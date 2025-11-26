@@ -1,22 +1,42 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Smartphone, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Smartphone, CheckCircle2, Wrench } from "lucide-react";
 import { useState } from "react";
 
 interface QRCodeDisplayProps {
   qrCode: string | null;
   isConnected: boolean;
   onRefresh: () => void;
+  onRepair: () => void;
+  isRepairing?: boolean;
+  isRefreshing?: boolean;
 }
 
-export default function QRCodeDisplay({ qrCode, isConnected, onRefresh }: QRCodeDisplayProps) {
-  const [isRefreshing, setIsRefreshing] = useState(false);
+export default function QRCodeDisplay({ 
+  qrCode, 
+  isConnected, 
+  onRefresh, 
+  onRepair,
+  isRepairing = false,
+  isRefreshing = false
+}: QRCodeDisplayProps) {
+  const [localRefreshing, setLocalRefreshing] = useState(false);
+  const [localRepairing, setLocalRepairing] = useState(false);
 
   const handleRefresh = () => {
-    setIsRefreshing(true);
+    setLocalRefreshing(true);
     onRefresh();
-    setTimeout(() => setIsRefreshing(false), 1500);
+    setTimeout(() => setLocalRefreshing(false), 1500);
   };
+
+  const handleRepair = () => {
+    setLocalRepairing(true);
+    onRepair();
+    setTimeout(() => setLocalRepairing(false), 3000);
+  };
+
+  const showRefreshing = isRefreshing || localRefreshing;
+  const showRepairing = isRepairing || localRepairing;
 
   if (isConnected) {
     return (
@@ -52,16 +72,28 @@ export default function QRCodeDisplay({ qrCode, isConnected, onRefresh }: QRCode
             </CardTitle>
             <CardDescription>Connect your WhatsApp to activate GX-MODY</CardDescription>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            data-testid="button-refresh-qr"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRepair}
+              disabled={showRepairing}
+              data-testid="button-repair"
+            >
+              <Wrench className={`h-4 w-4 mr-2 ${showRepairing ? 'animate-pulse' : ''}`} />
+              Repair
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={showRefreshing}
+              data-testid="button-refresh-qr"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${showRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col items-center justify-center py-4">

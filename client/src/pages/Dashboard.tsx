@@ -90,6 +90,21 @@ export default function Dashboard() {
     },
   });
 
+  const repairMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/repair', {}),
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: 'Repair Complete', description: data.message });
+      } else {
+        toast({ title: 'Repair Issue', description: data.message, variant: 'destructive' });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/status'] });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to repair connection', variant: 'destructive' });
+    },
+  });
+
   const settingsMutation = useMutation({
     mutationFn: (data: BotSettings) => apiRequest('POST', '/api/settings', data),
     onSuccess: () => {
@@ -150,6 +165,10 @@ export default function Dashboard() {
 
   const handleRefreshQR = () => {
     refreshQRMutation.mutate();
+  };
+
+  const handleRepair = () => {
+    repairMutation.mutate();
   };
 
   const handleSaveSettings = (newSettings: BotSettings) => {
@@ -217,6 +236,9 @@ export default function Dashboard() {
                 qrCode={qrCode || currentStatus?.qrCode || null}
                 isConnected={isConnected}
                 onRefresh={handleRefreshQR}
+                onRepair={handleRepair}
+                isRepairing={repairMutation.isPending}
+                isRefreshing={refreshQRMutation.isPending}
               />
             </div>
           </TabsContent>

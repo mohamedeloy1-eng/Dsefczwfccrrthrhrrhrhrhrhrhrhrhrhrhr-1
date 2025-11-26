@@ -1,6 +1,7 @@
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
 type Message = pkg.Message;
+type ClientType = InstanceType<typeof Client>;
 import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
 
@@ -20,7 +21,7 @@ export interface WhatsAppStatus {
 }
 
 class WhatsAppService extends EventEmitter {
-  private client: Client | null = null;
+  private client: ClientType | null = null;
   private status: WhatsAppStatus = {
     isConnected: false,
     isReady: false,
