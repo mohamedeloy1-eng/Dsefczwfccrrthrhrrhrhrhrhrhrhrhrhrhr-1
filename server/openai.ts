@@ -1,8 +1,12 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+  return new OpenAI({ apiKey });
+}
 
 interface ConversationMessage {
   role: 'system' | 'user' | 'assistant';
@@ -74,6 +78,7 @@ export async function generateResponse(userId: string, userMessage: string): Pro
       ...history,
     ];
 
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: messages,
@@ -94,14 +99,18 @@ export async function generateResponse(userId: string, userMessage: string): Pro
   } catch (error: any) {
     console.error('OpenAI API error:', error?.message || error);
     
+    if (error?.message?.includes('OPENAI_API_KEY is not configured')) {
+      return 'عذراً، مفتاح OpenAI API غير مضاف. يرجى إضافته في الإعدادات.';
+    }
+    
     if (error?.status === 401) {
-      return 'Sorry, there is an issue with the API configuration. Please contact the administrator.';
+      return 'عذراً، مفتاح OpenAI API غير صحيح. يرجى التحقق منه.';
     }
     
     if (error?.status === 429) {
-      return 'Sorry, the service is currently busy. Please try again in a moment.';
+      return 'عذراً، الخدمة مشغولة حالياً. يرجى المحاولة لاحقاً.';
     }
     
-    return 'Sorry, I encountered an error while processing your message. Please try again.';
+    return 'عذراً، حدث خطأ أثناء معالجة رسالتك. يرجى المحاولة مرة أخرى.';
   }
 }
