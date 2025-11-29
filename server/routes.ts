@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { whatsappService, type WhatsAppMessage } from "./whatsapp";
-import { generateResponse, updateSettings, getSettings, clearConversationHistory, clearAllConversations } from "./openai";
+import { generateResponse, generateImage, updateSettings, getSettings, clearConversationHistory, clearAllConversations } from "./openai";
 import { conversationStore } from "./conversationStore";
 import type { BotStatus } from "./types";
 
@@ -76,6 +76,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   whatsappService.setMessageHandler(async (message: WhatsAppMessage) => {
     try {
+      const imagePatterns = [
+        /^صورة[:\s]+(.+)/i,
+        /^image[:\s]+(.+)/i,
+        /^ارسم[:\s]+(.+)/i,
+        /^draw[:\s]+(.+)/i,
+        /^generate[:\s]+(.+)/i,
+      ];
+      
+      const stickerPatterns = [
+        /^استيكر[:\s]+(.+)/i,
+        /^sticker[:\s]+(.+)/i,
+        /^ملصق[:\s]+(.+)/i,
+      ];
+      
+      let imagePrompt: string | null = null;
+      let isSticker = false;
+      
+      for (const pattern of stickerPatterns) {
+        const match = message.body.match(pattern);
+        if (match) {
+          imagePrompt = match[1].trim();
+          isSticker = true;
+          break;
+        }
+      }
+      
+      if (!imagePrompt) {
+        for (const pattern of imagePatterns) {
+          const match = message.body.match(pattern);
+          if (match) {
+            imagePrompt = match[1].trim();
+            break;
+          }
+        }
+      }
+      
+      if (imagePrompt) {
+        const result = await generateImage(imagePrompt);
+        
+        if (result.success && result.imageUrl) {
+          try {
+            const sent = await whatsappService.sendImage(message.from, result.imageUrl, isSticker);
+            if (sent) {
+              const successMsg = isSticker ? '✅ تم إرسال الاستيكر بنجاح!' : '✅ تم إرسال الصورة بنجاح!';
+              const timestamp = Math.floor(Date.now() / 1000);
+              conversationStore.addMessage(message.from, successMsg, true, timestamp);
+              broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from) } });
+              return null;
+            } else {
+              return `❌ فشل في إرسال ${isSticker ? 'الاستيكر' : 'الصورة'}. حاول مرة أخرى.`;
+            }
+          } catch (err) {
+            console.error('Error sending image:', err);
+            return `❌ فشل في إرسال ${isSticker ? 'الاستيكر' : 'الصورة'}. حاول مرة أخرى.`;
+          }
+        } else {
+          return `❌ ${result.error || 'فشل في إنشاء الصورة. حاول مرة أخرى.'}`;
+        }
+      }
+      
       const response = await generateResponse(message.from, message.body);
       if (response) {
         const timestamp = Math.floor(Date.now() / 1000);
@@ -97,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return response;
     } catch (error) {
       console.error('Error in message handler:', error);
-      return null;
+      return 'عذراً، حدث خطأ. حاول مرة أخرى.';
     }
   });
 

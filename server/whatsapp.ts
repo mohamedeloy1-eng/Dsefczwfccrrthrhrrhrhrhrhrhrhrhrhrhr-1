@@ -1,9 +1,11 @@
 import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 type Message = pkg.Message;
 type ClientType = InstanceType<typeof Client>;
 import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
+import https from 'https';
+import http from 'http';
 
 export interface WhatsAppMessage {
   id: string;
@@ -170,6 +172,60 @@ class WhatsAppService extends EventEmitter {
       console.error('Error sending message:', err);
       return false;
     }
+  }
+
+  async sendImage(to: string, imageUrl: string, asSticker: boolean = false): Promise<boolean> {
+    if (!this.client || !this.status.isReady) {
+      console.error('WhatsApp client not ready');
+      return false;
+    }
+
+    try {
+      const { buffer, mimeType } = await this.downloadImageWithMime(imageUrl);
+      const base64 = buffer.toString('base64');
+      const extension = mimeType.includes('png') ? 'png' : 'jpg';
+      const media = new MessageMedia(mimeType, base64, `generated-image.${extension}`);
+      
+      if (asSticker) {
+        await this.client.sendMessage(to, media, { 
+          sendMediaAsSticker: true,
+          stickerAuthor: 'GX-MODY',
+          stickerName: 'AI Generated'
+        });
+      } else {
+        await this.client.sendMessage(to, media);
+      }
+      return true;
+    } catch (err) {
+      console.error('Error sending image:', err);
+      return false;
+    }
+  }
+
+  private downloadImageWithMime(url: string): Promise<{ buffer: Buffer; mimeType: string }> {
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https') ? https : http;
+      protocol.get(url, (response) => {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = response.headers.location;
+          if (redirectUrl) {
+            this.downloadImageWithMime(redirectUrl).then(resolve).catch(reject);
+            return;
+          }
+        }
+        
+        const contentType = response.headers['content-type'] || 'image/png';
+        const mimeType = contentType.split(';')[0].trim();
+        
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => resolve({ 
+          buffer: Buffer.concat(chunks), 
+          mimeType: mimeType.startsWith('image/') ? mimeType : 'image/png'
+        }));
+        response.on('error', reject);
+      }).on('error', reject);
+    });
   }
 
   async disconnect(): Promise<void> {
