@@ -20,6 +20,8 @@ export interface WhatsAppStatus {
   isConnected: boolean;
   isReady: boolean;
   qrCode: string | null;
+  connectedNumber: string | null;
+  pairingCode: string | null;
 }
 
 class WhatsAppService extends EventEmitter {
@@ -28,7 +30,10 @@ class WhatsAppService extends EventEmitter {
     isConnected: false,
     isReady: false,
     qrCode: null,
+    connectedNumber: null,
+    pairingCode: null,
   };
+  private pairingMode: boolean = false;
   private messageHandler: ((message: WhatsAppMessage) => Promise<string | null>) | null = null;
 
   constructor() {
@@ -84,11 +89,23 @@ class WhatsAppService extends EventEmitter {
       }
     });
 
-    this.client.on('ready', () => {
+    this.client.on('ready', async () => {
       console.log('WhatsApp client is ready!');
       this.status.isConnected = true;
       this.status.isReady = true;
       this.status.qrCode = null;
+      this.status.pairingCode = null;
+      
+      try {
+        const info = await this.client!.info;
+        if (info && info.wid) {
+          this.status.connectedNumber = info.wid.user;
+          console.log('Connected number:', this.status.connectedNumber);
+        }
+      } catch (err) {
+        console.error('Error getting client info:', err);
+      }
+      
       this.emit('ready');
       this.emit('status', this.status);
     });
@@ -112,6 +129,8 @@ class WhatsAppService extends EventEmitter {
       this.status.isConnected = false;
       this.status.isReady = false;
       this.status.qrCode = null;
+      this.status.connectedNumber = null;
+      this.status.pairingCode = null;
       this.emit('disconnected', reason);
       this.emit('status', this.status);
     });
@@ -240,9 +259,153 @@ class WhatsAppService extends EventEmitter {
           isConnected: false,
           isReady: false,
           qrCode: null,
+          connectedNumber: null,
+          pairingCode: null,
         };
+        this.pairingMode = false;
         this.emit('status', this.status);
       }
+    }
+  }
+
+  async requestPairingCode(phoneNumber: string): Promise<{ success: boolean; code?: string; error?: string }> {
+    try {
+      if (!this.client) {
+        this.pairingMode = true;
+        await this.initializeForPairing();
+      }
+
+      if (!this.client) {
+        return { success: false, error: 'Failed to initialize client' };
+      }
+
+      const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+      console.log('Requesting pairing code for:', formattedNumber);
+      
+      const code = await (this.client as any).requestPairingCode(formattedNumber);
+      console.log('Pairing code received:', code);
+      
+      this.status.pairingCode = code;
+      this.emit('pairingCode', code);
+      this.emit('status', this.status);
+      
+      return { success: true, code };
+    } catch (error: any) {
+      console.error('Error requesting pairing code:', error);
+      return { success: false, error: error?.message || 'Failed to request pairing code' };
+    }
+  }
+
+  private async initializeForPairing(): Promise<void> {
+    if (this.client) {
+      return;
+    }
+
+    console.log('Initializing WhatsApp client for pairing...');
+    
+    this.client = new Client({
+      authStrategy: new LocalAuth({
+        dataPath: './.wwebjs_auth',
+      }),
+      puppeteer: {
+        headless: true,
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu',
+          '--disable-extensions',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+        ],
+      },
+    });
+
+    this.client.on('ready', async () => {
+      console.log('WhatsApp client is ready (pairing mode)!');
+      this.status.isConnected = true;
+      this.status.isReady = true;
+      this.status.qrCode = null;
+      this.status.pairingCode = null;
+      
+      try {
+        const info = await this.client!.info;
+        if (info && info.wid) {
+          this.status.connectedNumber = info.wid.user;
+          console.log('Connected number:', this.status.connectedNumber);
+        }
+      } catch (err) {
+        console.error('Error getting client info:', err);
+      }
+      
+      this.pairingMode = false;
+      this.emit('ready');
+      this.emit('status', this.status);
+    });
+
+    this.client.on('authenticated', () => {
+      console.log('WhatsApp client authenticated (pairing mode)');
+      this.status.isConnected = true;
+      this.emit('authenticated');
+    });
+
+    this.client.on('auth_failure', (msg: string) => {
+      console.error('WhatsApp authentication failed (pairing mode):', msg);
+      this.status.isConnected = false;
+      this.status.isReady = false;
+      this.pairingMode = false;
+      this.emit('auth_failure', msg);
+      this.emit('status', this.status);
+    });
+
+    this.client.on('disconnected', (reason: string) => {
+      console.log('WhatsApp client disconnected (pairing mode):', reason);
+      this.status.isConnected = false;
+      this.status.isReady = false;
+      this.status.qrCode = null;
+      this.status.connectedNumber = null;
+      this.status.pairingCode = null;
+      this.pairingMode = false;
+      this.emit('disconnected', reason);
+      this.emit('status', this.status);
+    });
+
+    this.client.on('message', async (message: Message) => {
+      const whatsappMessage: WhatsAppMessage = {
+        id: message.id._serialized,
+        from: message.from,
+        to: message.to,
+        body: message.body,
+        timestamp: message.timestamp,
+        isFromMe: message.fromMe,
+      };
+
+      this.emit('message', whatsappMessage);
+
+      if (!message.fromMe && this.messageHandler) {
+        try {
+          const response = await this.messageHandler(whatsappMessage);
+          if (response) {
+            await message.reply(response);
+            console.log('Replied to message');
+          }
+        } catch (err) {
+          console.error('Error handling message:', err);
+        }
+      }
+    });
+
+    try {
+      await this.client.initialize();
+    } catch (err) {
+      console.error('Error initializing WhatsApp client for pairing:', err);
+      throw err;
     }
   }
 
@@ -284,7 +447,10 @@ class WhatsAppService extends EventEmitter {
         isConnected: false,
         isReady: false,
         qrCode: null,
+        connectedNumber: null,
+        pairingCode: null,
       };
+      this.pairingMode = false;
       this.emit('status', this.status);
 
       diagnostics.actions.push('Reinitializing WhatsApp client');

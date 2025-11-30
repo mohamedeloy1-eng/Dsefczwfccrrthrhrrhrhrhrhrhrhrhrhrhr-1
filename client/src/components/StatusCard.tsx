@@ -1,14 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Wifi, WifiOff, Bot, MessageSquare, Users } from "lucide-react";
+import { Wifi, WifiOff, Bot, MessageSquare, Users, Phone } from "lucide-react";
 
 interface StatusCardProps {
   status: "connected" | "disconnected" | "connecting";
   messagesCount: number;
   usersCount: number;
+  connectedNumber?: string | null;
 }
 
-export default function StatusCard({ status, messagesCount, usersCount }: StatusCardProps) {
+export default function StatusCard({ status, messagesCount, usersCount, connectedNumber }: StatusCardProps) {
   const statusConfig = {
     connected: {
       icon: Wifi,
@@ -31,10 +32,16 @@ export default function StatusCard({ status, messagesCount, usersCount }: Status
   };
 
   const config = statusConfig[status];
-  const StatusIcon = config.icon;
+
+  const formatPhoneNumber = (number: string) => {
+    if (number.length > 10) {
+      return `+${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`;
+    }
+    return `+${number}`;
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="status-cards">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4" data-testid="status-cards">
       <Card data-testid="card-bot-status">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-2">
@@ -51,6 +58,28 @@ export default function StatusCard({ status, messagesCount, usersCount }: Status
               <span className={`h-2 w-2 rounded-full ${config.color} animate-pulse`} />
               {config.label}
             </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-connected-number">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-md ${connectedNumber ? 'bg-primary/10' : 'bg-muted'}`}>
+              <Phone className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-muted-foreground">Connected Number</p>
+              {connectedNumber ? (
+                <p className="text-lg font-bold truncate" data-testid="text-connected-number" dir="ltr">
+                  {formatPhoneNumber(connectedNumber)}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="text-no-number">
+                  Not connected
+                </p>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -19,6 +19,8 @@ export interface BotStatus {
   isConnected: boolean;
   isReady: boolean;
   qrCode: string | null;
+  connectedNumber: string | null;
+  pairingCode: string | null;
   messagesCount: number;
   usersCount: number;
 }

@@ -33,6 +33,8 @@ interface BotStatus {
   isConnected: boolean;
   isReady: boolean;
   qrCode: string | null;
+  connectedNumber: string | null;
+  pairingCode: string | null;
   messagesCount: number;
   usersCount: number;
 }
@@ -48,6 +50,7 @@ export default function Dashboard() {
   const { subscribe } = useWebSocket();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<BotStatus | null>(null);
 
   const { data: status, isLoading: statusLoading } = useQuery<BotStatus>({
@@ -123,11 +126,19 @@ export default function Dashboard() {
         setQrCode(data.qrCode);
       } else if (data.isConnected) {
         setQrCode(null);
+        setPairingCode(null);
+      }
+      if (data.pairingCode) {
+        setPairingCode(data.pairingCode);
       }
     });
 
     const unsubQR = subscribe('qr', (data: string) => {
       setQrCode(data);
+    });
+
+    const unsubPairingCode = subscribe('pairingCode', (data: string) => {
+      setPairingCode(data);
     });
 
     const unsubMessage = subscribe('message', () => {
@@ -145,6 +156,7 @@ export default function Dashboard() {
     return () => {
       unsubStatus();
       unsubQR();
+      unsubPairingCode();
       unsubMessage();
       unsubStats();
       unsubSettings();
@@ -175,8 +187,23 @@ export default function Dashboard() {
     settingsMutation.mutate(newSettings);
   };
 
+  const handleRequestPairingCode = async (phoneNumber: string): Promise<{ success: boolean; code?: string; error?: string }> => {
+    try {
+      const response = await apiRequest('POST', '/api/request-pairing-code', { phoneNumber });
+      const result = await response.json() as { success: boolean; code?: string; error?: string };
+      if (result.success && result.code) {
+        setPairingCode(result.code);
+        toast({ title: 'Code Received', description: 'Enter the code in WhatsApp to link your device' });
+      }
+      return result;
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Failed to request pairing code' };
+    }
+  };
+
   const messagesCount = currentStatus?.messagesCount || 0;
   const usersCount = currentStatus?.usersCount || 0;
+  const connectedNumber = currentStatus?.connectedNumber || null;
 
   return (
     <div className="min-h-screen bg-background" data-testid="dashboard-page">
@@ -190,6 +217,7 @@ export default function Dashboard() {
           status={isConnected ? "connected" : (connectMutation.isPending ? "connecting" : "disconnected")} 
           messagesCount={messagesCount}
           usersCount={usersCount}
+          connectedNumber={connectedNumber}
         />
 
         <Tabs defaultValue="conversations" className="w-full">
@@ -237,6 +265,8 @@ export default function Dashboard() {
                 isConnected={isConnected}
                 onRefresh={handleRefreshQR}
                 onRepair={handleRepair}
+                onRequestPairingCode={handleRequestPairingCode}
+                pairingCode={pairingCode}
                 isRepairing={repairMutation.isPending}
                 isRefreshing={refreshQRMutation.isPending}
               />

@@ -57,6 +57,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcast({ type: 'qr', data: qrCode });
   });
 
+  whatsappService.on('pairingCode', (code: string) => {
+    broadcast({ type: 'pairingCode', data: code });
+  });
+
   whatsappService.on('message', (message: WhatsAppMessage) => {
     const conversation = conversationStore.addMessage(
       message.from,
@@ -207,6 +211,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false, 
         message: error?.message || 'Failed to repair',
         diagnostics: null 
+      });
+    }
+  });
+
+  app.post('/api/request-pairing-code', async (req, res) => {
+    try {
+      const { phoneNumber } = req.body;
+      if (!phoneNumber) {
+        return res.status(400).json({ success: false, error: 'Phone number is required' });
+      }
+      
+      const result = await whatsappService.requestPairingCode(phoneNumber);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        error: error?.message || 'Failed to request pairing code' 
       });
     }
   });
