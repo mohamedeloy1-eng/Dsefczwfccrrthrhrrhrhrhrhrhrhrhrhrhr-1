@@ -15,23 +15,24 @@ GX-MODY is an intelligent WhatsApp bot powered by OpenAI's GPT model. It automat
 ### Frontend (client/)
 - **Dashboard.tsx** - Main dashboard page with tabs for Chats, Connection, and Settings
 - **Header.tsx** - App header with connection toggle and theme switcher
-- **StatusCard.tsx** - Bot status, message count, and user count display
-- **QRCodeDisplay.tsx** - QR code for WhatsApp connection
+- **StatusCard.tsx** - Bot status, connected phone number, message count, and user count display
+- **QRCodeDisplay.tsx** - QR code and phone number linking for WhatsApp connection (supports both methods)
 - **ConversationList.tsx** - List of all conversations
 - **ChatView.tsx** - Individual conversation message view
 - **SettingsPanel.tsx** - Bot configuration (name, system prompt, auto-reply toggle)
 
 ### Real-time Updates
 - WebSocket connection at `/ws` for live updates
-- Events: status, qr, message, stats, settings
+- Events: status, qr, pairingCode, message, stats, settings
 
 ## API Endpoints
 
 ### Status & Connection
-- `GET /api/status` - Get bot status, message count, user count
+- `GET /api/status` - Get bot status, connected number, message count, user count
 - `POST /api/connect` - Initialize WhatsApp connection
 - `POST /api/disconnect` - Disconnect from WhatsApp
 - `POST /api/refresh-qr` - Refresh QR code
+- `POST /api/request-pairing-code` - Request pairing code for phone number linking
 
 ### Conversations
 - `GET /api/conversations` - Get all conversations
@@ -49,10 +50,13 @@ GX-MODY is an intelligent WhatsApp bot powered by OpenAI's GPT model. It automat
 
 ## How to Use
 1. Open the app and go to the "Connect" tab
-2. Scan the QR code with WhatsApp on your phone
+2. Choose your connection method:
+   - **QR Code**: Scan the QR code with WhatsApp on your phone
+   - **Phone Number**: Enter your phone number with country code, get a linking code, and enter it in WhatsApp
 3. Once connected, the bot will automatically respond to incoming messages
-4. Configure bot behavior in the "Settings" tab
-5. View conversations in the "Chats" tab
+4. View your connected phone number in the status cards at the top
+5. Configure bot behavior in the "Settings" tab
+6. View conversations in the "Chats" tab
 
 ## Tech Stack
 - Frontend: React, TanStack Query, Tailwind CSS, shadcn/ui
