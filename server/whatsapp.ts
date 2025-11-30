@@ -34,6 +34,8 @@ class WhatsAppService extends EventEmitter {
     pairingCode: null,
   };
   private pairingMode: boolean = false;
+  private pendingPairingNumber: string | null = null;
+  private pairingResolver: ((result: { success: boolean; code?: string; error?: string }) => void) | null = null;
   private messageHandler: ((message: WhatsAppMessage) => Promise<string | null>) | null = null;
 
   constructor() {
@@ -263,37 +265,53 @@ class WhatsAppService extends EventEmitter {
           pairingCode: null,
         };
         this.pairingMode = false;
+        this.pendingPairingNumber = null;
+        this.pairingResolver = null;
         this.emit('status', this.status);
       }
     }
   }
 
   async requestPairingCode(phoneNumber: string): Promise<{ success: boolean; code?: string; error?: string }> {
-    try {
-      if (!this.client) {
-        this.pairingMode = true;
-        await this.initializeForPairing();
-      }
-
-      if (!this.client) {
-        return { success: false, error: 'Failed to initialize client' };
-      }
-
-      const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
-      console.log('Requesting pairing code for:', formattedNumber);
-      
-      const code = await (this.client as any).requestPairingCode(formattedNumber);
-      console.log('Pairing code received:', code);
-      
-      this.status.pairingCode = code;
-      this.emit('pairingCode', code);
-      this.emit('status', this.status);
-      
-      return { success: true, code };
-    } catch (error: any) {
-      console.error('Error requesting pairing code:', error);
-      return { success: false, error: error?.message || 'Failed to request pairing code' };
+    const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+    console.log('Requesting pairing code for:', formattedNumber);
+    
+    if (this.client && this.status.isConnected) {
+      return { success: false, error: 'Already connected to WhatsApp' };
     }
+
+    if (this.client) {
+      await this.disconnect();
+    }
+
+    this.pairingMode = true;
+    this.pendingPairingNumber = formattedNumber;
+
+    return new Promise((resolve) => {
+      this.pairingResolver = resolve;
+      
+      const timeout = setTimeout(() => {
+        if (this.pairingResolver) {
+          this.pairingResolver({ success: false, error: 'Pairing request timed out. Please try again.' });
+          this.pairingResolver = null;
+          this.pendingPairingNumber = null;
+          this.pairingMode = false;
+        }
+      }, 60000);
+
+      this.once('pairingComplete', (result) => {
+        clearTimeout(timeout);
+        resolve(result);
+      });
+
+      this.initializeForPairing().catch((err) => {
+        clearTimeout(timeout);
+        this.pairingResolver = null;
+        this.pendingPairingNumber = null;
+        this.pairingMode = false;
+        resolve({ success: false, error: err?.message || 'Failed to initialize WhatsApp client' });
+      });
+    });
   }
 
   private async initializeForPairing(): Promise<void> {
@@ -327,12 +345,33 @@ class WhatsAppService extends EventEmitter {
       },
     });
 
+    this.client.on('qr', async (qr: string) => {
+      console.log('QR received in pairing mode, requesting pairing code...');
+      
+      if (this.pairingMode && this.pendingPairingNumber) {
+        try {
+          const code = await (this.client as any).requestPairingCode(this.pendingPairingNumber);
+          console.log('Pairing code received:', code);
+          
+          this.status.pairingCode = code;
+          this.emit('pairingCode', code);
+          this.emit('status', this.status);
+          this.emit('pairingComplete', { success: true, code });
+        } catch (err: any) {
+          console.error('Error requesting pairing code:', err);
+          this.emit('pairingComplete', { success: false, error: err?.message || 'Failed to get pairing code' });
+        }
+      }
+    });
+
     this.client.on('ready', async () => {
       console.log('WhatsApp client is ready (pairing mode)!');
       this.status.isConnected = true;
       this.status.isReady = true;
       this.status.qrCode = null;
       this.status.pairingCode = null;
+      this.pendingPairingNumber = null;
+      this.pairingResolver = null;
       
       try {
         const info = await this.client!.info;
@@ -360,6 +399,8 @@ class WhatsAppService extends EventEmitter {
       this.status.isConnected = false;
       this.status.isReady = false;
       this.pairingMode = false;
+      this.pendingPairingNumber = null;
+      this.pairingResolver = null;
       this.emit('auth_failure', msg);
       this.emit('status', this.status);
     });
@@ -372,6 +413,8 @@ class WhatsAppService extends EventEmitter {
       this.status.connectedNumber = null;
       this.status.pairingCode = null;
       this.pairingMode = false;
+      this.pendingPairingNumber = null;
+      this.pairingResolver = null;
       this.emit('disconnected', reason);
       this.emit('status', this.status);
     });
