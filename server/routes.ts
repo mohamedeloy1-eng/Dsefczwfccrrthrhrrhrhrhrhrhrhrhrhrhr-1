@@ -264,6 +264,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/connect', async (req, res) => {
     try {
+      if (userStore.isSafeModeEnabled()) {
+        return res.status(403).json({ success: false, error: 'Cannot connect while Safe Mode is enabled. Disable Safe Mode first.' });
+      }
       await whatsappService.initialize();
       res.json({ success: true, message: 'Initializing WhatsApp connection...' });
     } catch (error: any) {
@@ -335,6 +338,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/conversations/:phoneNumber/send', async (req, res) => {
+    if (userStore.isSafeModeEnabled()) {
+      return res.status(403).json({ error: 'Cannot send messages while Safe Mode is enabled' });
+    }
+
     const { message } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });

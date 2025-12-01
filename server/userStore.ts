@@ -6,7 +6,7 @@ class UserStore {
   private rateLimits: Map<string, RateLimitData> = new Map();
   private securitySettings: SecuritySettings = {
     defaultMessageLimit: 20,
-    spamThreshold: 10,
+    spamThreshold: 5,
     autoBlockEnabled: true,
     safeModeEnabled: false,
     maxMessagesPerDay: 500,
@@ -173,18 +173,22 @@ class UserStore {
     if (!rateLimit) {
       rateLimit = {
         phoneNumber: normalizedPhone,
-        messageCount: 0,
+        messageCount: 1,
         windowStart: now,
         blocked: false,
       };
+      this.rateLimits.set(normalizedPhone, rateLimit);
+      return { allowed: true };
     }
 
     const windowMs = 60 * 1000;
     const timeSinceStart = now.getTime() - rateLimit.windowStart.getTime();
 
     if (timeSinceStart > windowMs) {
-      rateLimit.messageCount = 0;
+      rateLimit.messageCount = 1;
       rateLimit.windowStart = now;
+      this.rateLimits.set(normalizedPhone, rateLimit);
+      return { allowed: true };
     }
 
     if (rateLimit.blocked) {
@@ -198,16 +202,17 @@ class UserStore {
     }
 
     const messageLimit = user.messageLimit || this.securitySettings.defaultMessageLimit;
-    if (rateLimit.messageCount >= messageLimit) {
+    
+    rateLimit.messageCount++;
+    this.rateLimits.set(normalizedPhone, rateLimit);
+    
+    if (rateLimit.messageCount > messageLimit) {
       return { allowed: false, reason: `Rate limit exceeded (${messageLimit}/min)` };
     }
 
     if (user.messagesToday >= this.securitySettings.maxMessagesPerDay) {
       return { allowed: false, reason: `Daily limit exceeded (${this.securitySettings.maxMessagesPerDay}/day)` };
     }
-
-    rateLimit.messageCount++;
-    this.rateLimits.set(normalizedPhone, rateLimit);
 
     return { allowed: true };
   }
@@ -227,7 +232,7 @@ class UserStore {
     this.users.set(normalizedPhone, user);
   }
 
-  recordError(phoneNumber: string, errorMessage: string): { shouldBlock: boolean } {
+  recordError(phoneNumber: string, errorMessage: string): { shouldBlock: boolean; blocked: boolean } {
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
     const user = this.getOrCreateUser(normalizedPhone);
     
@@ -237,14 +242,18 @@ class UserStore {
     
     this.users.set(normalizedPhone, user);
 
-    if (this.securitySettings.autoBlockEnabled && 
-        user.errorCount >= this.securitySettings.spamThreshold) {
-      this.blockUser(normalizedPhone, 'Auto-blocked due to repeated errors');
-      this.setUserClassification(normalizedPhone, 'spam');
-      return { shouldBlock: true };
+    const threshold = this.securitySettings.spamThreshold;
+    const shouldAutoBlock = this.securitySettings.autoBlockEnabled && user.errorCount >= threshold;
+
+    if (shouldAutoBlock && !user.isBlocked) {
+      const blocked = this.blockUser(normalizedPhone, `Auto-blocked: ${user.errorCount} errors (threshold: ${threshold})`);
+      if (blocked) {
+        this.setUserClassification(normalizedPhone, 'spam');
+      }
+      return { shouldBlock: true, blocked };
     }
 
-    return { shouldBlock: false };
+    return { shouldBlock: false, blocked: user.isBlocked };
   }
 
   getSecuritySettings(): SecuritySettings {

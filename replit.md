@@ -9,27 +9,54 @@ GX-MODY is an intelligent WhatsApp bot powered by OpenAI's GPT model. It automat
 - **whatsapp.ts** - WhatsApp Web.js service for connecting to WhatsApp, handling QR code generation, and message processing
 - **openai.ts** - OpenAI integration for generating AI responses with conversation context
 - **conversationStore.ts** - In-memory storage for conversation history and statistics
+- **userStore.ts** - User management with rate limiting, blocking, and classifications
+- **logStore.ts** - Complete message logging system with timestamps and session IDs
 - **routes.ts** - REST API endpoints + WebSocket for real-time updates
 - **types.ts** - TypeScript type definitions
 
 ### Frontend (client/)
-- **Dashboard.tsx** - Main dashboard page with tabs for Chats, Connection, and Settings
+- **Dashboard.tsx** - Main dashboard page with tabs for Chats, Users, Security, Connection, and Settings
 - **Header.tsx** - App header with connection toggle and theme switcher
 - **StatusCard.tsx** - Bot status, connected phone number, message count, and user count display
 - **QRCodeDisplay.tsx** - QR code and phone number linking for WhatsApp connection (supports both methods)
 - **ConversationList.tsx** - List of all conversations
 - **ChatView.tsx** - Individual conversation message view
 - **SettingsPanel.tsx** - Bot configuration (name, system prompt, auto-reply toggle)
+- **UserManagement.tsx** - User management panel with search, filtering, blocking, and statistics
+- **SecurityPanel.tsx** - Security settings, SAFE MODE, and complete logging system
 
 ### Real-time Updates
 - WebSocket connection at `/ws` for live updates
-- Events: status, qr, pairingCode, message, stats, settings
+- Events: status, qr, pairingCode, message, stats, settings, users, security, safe_mode, security_settings
+
+## Security Features
+
+### Rate Limiting
+- Default: 20 messages per minute per user
+- Configurable per user
+- Daily limit: 500 messages per day (configurable)
+
+### Auto-Ban System
+- Automatic blocking after 5 errors (spam threshold)
+- Users classified as 'spam' are automatically blocked
+
+### SAFE MODE
+- Emergency shutdown feature
+- Stops all message processing
+- Disconnects WhatsApp
+- Clears all user sessions
+- Prevents new connections until disabled
+
+### User Classification
+- Normal: Regular users
+- Test: Testing accounts
+- Spam: Blocked users
 
 ## API Endpoints
 
 ### Status & Connection
-- `GET /api/status` - Get bot status, connected number, message count, user count
-- `POST /api/connect` - Initialize WhatsApp connection
+- `GET /api/status` - Get bot status, connected number, message count, user count, safe mode status
+- `POST /api/connect` - Initialize WhatsApp connection (blocked in safe mode)
 - `POST /api/disconnect` - Disconnect from WhatsApp
 - `POST /api/refresh-qr` - Refresh QR code
 - `POST /api/request-pairing-code` - Request pairing code for phone number linking
@@ -37,9 +64,36 @@ GX-MODY is an intelligent WhatsApp bot powered by OpenAI's GPT model. It automat
 ### Conversations
 - `GET /api/conversations` - Get all conversations
 - `GET /api/conversations/:phoneNumber` - Get specific conversation
-- `POST /api/conversations/:phoneNumber/send` - Send message to user
+- `POST /api/conversations/:phoneNumber/send` - Send message to user (blocked in safe mode)
 - `POST /api/conversations/:phoneNumber/clear` - Clear conversation history
 - `POST /api/conversations/clear-all` - Clear all conversations
+
+### User Management
+- `GET /api/users` - Get all users
+- `GET /api/users/search?q=query` - Search users
+- `GET /api/users/:phoneNumber` - Get specific user
+- `POST /api/users/:phoneNumber/block` - Block user
+- `POST /api/users/:phoneNumber/unblock` - Unblock user
+- `POST /api/users/:phoneNumber/classification` - Set user classification
+- `POST /api/users/:phoneNumber/limit` - Set user message limit
+- `POST /api/users/:phoneNumber/delete-session` - Delete user session
+- `GET /api/users/stats/summary` - Get user statistics
+
+### Security
+- `GET /api/security/settings` - Get security settings
+- `POST /api/security/settings` - Update security settings
+- `POST /api/security/safe-mode/enable` - Enable SAFE MODE
+- `POST /api/security/safe-mode/disable` - Disable SAFE MODE
+
+### Logs
+- `GET /api/logs?limit=100` - Get recent logs
+- `GET /api/logs/phone/:phoneNumber` - Get logs for specific user
+- `GET /api/logs/errors` - Get error logs
+- `GET /api/logs/blocked` - Get blocked/rate-limited logs
+- `GET /api/logs/stats` - Get log statistics
+- `GET /api/logs/search?q=query` - Search logs
+- `POST /api/logs/clear` - Clear all logs
+- `POST /api/logs/clear/:phoneNumber` - Clear logs for specific user
 
 ### Settings
 - `GET /api/settings` - Get bot settings
@@ -49,14 +103,16 @@ GX-MODY is an intelligent WhatsApp bot powered by OpenAI's GPT model. It automat
 - `OPENAI_API_KEY` - OpenAI API key for AI responses (required)
 
 ## How to Use
-1. Open the app and go to the "Connect" tab
+1. Open the app and go to the "الاتصال" (Connect) tab
 2. Choose your connection method:
    - **QR Code**: Scan the QR code with WhatsApp on your phone
    - **Phone Number**: Enter your phone number with country code, get a linking code, and enter it in WhatsApp
 3. Once connected, the bot will automatically respond to incoming messages
 4. View your connected phone number in the status cards at the top
-5. Configure bot behavior in the "Settings" tab
-6. View conversations in the "Chats" tab
+5. Configure bot behavior in the "الإعدادات" (Settings) tab
+6. View conversations in the "المحادثات" (Chats) tab
+7. Manage users in the "المستخدمين" (Users) tab
+8. Control security settings and SAFE MODE in the "الأمان" (Security) tab
 
 ## Tech Stack
 - Frontend: React, TanStack Query, Tailwind CSS, shadcn/ui
