@@ -353,44 +353,54 @@ class WhatsAppService extends EventEmitter {
       if (this.pairingMode && this.pendingPairingNumber && !pairingCodeRequested) {
         pairingCodeRequested = true;
         
-        console.log('Waiting 6 seconds for WhatsApp Web to fully load...');
-        await new Promise(resolve => setTimeout(resolve, 6000));
-        
-        const maxRetries = 3;
-        let lastError: any = null;
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            console.log(`Pairing code request attempt ${attempt}/${maxRetries}...`);
-            
-            const code = await (this.client as any).requestPairingCode(this.pendingPairingNumber, true);
-            console.log('Pairing code received:', code);
-            
-            this.status.pairingCode = code;
-            this.emit('pairingCode', code);
-            this.emit('status', this.status);
-            this.emit('pairingComplete', { success: true, code });
-            return;
-          } catch (err: any) {
-            lastError = err;
-            console.error(`Pairing code attempt ${attempt} failed:`, err?.message || err);
-            
-            if (attempt < maxRetries) {
-              const waitTime = 3000 * attempt;
-              console.log(`Retrying in ${waitTime / 1000} seconds...`);
-              await new Promise(resolve => setTimeout(resolve, waitTime));
-            }
+        try {
+          console.log('Injecting onCodeReceivedEvent function into page...');
+          
+          const pupPage = (this.client as any).pupPage;
+          if (!pupPage) {
+            throw new Error('Puppeteer page not available');
           }
+          
+          const functionExists = await pupPage.evaluate(() => {
+            return typeof (window as any).onCodeReceivedEvent === 'function';
+          });
+          
+          if (!functionExists) {
+            await pupPage.exposeFunction('onCodeReceivedEvent', (code: string) => {
+              console.log('Pairing code received via exposed function:', code);
+              return code;
+            });
+            console.log('onCodeReceivedEvent function injected successfully');
+          } else {
+            console.log('onCodeReceivedEvent function already exists');
+          }
+          
+          console.log('Waiting for WhatsApp Web to fully load...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          console.log('Requesting pairing code...');
+          const code = await (this.client as any).requestPairingCode(this.pendingPairingNumber, true);
+          console.log('Pairing code received:', code);
+          
+          this.status.pairingCode = code;
+          this.emit('pairingCode', code);
+          this.emit('status', this.status);
+          this.emit('pairingComplete', { success: true, code });
+          
+        } catch (err: any) {
+          pairingCodeRequested = false;
+          console.error('Error in pairing process:', err?.message || err);
+          
+          let errorMessage = 'فشل الحصول على كود الربط. يرجى المحاولة لاحقاً أو استخدام رمز QR.';
+          
+          if (err?.message?.includes('rate') || err?.message?.includes('429')) {
+            errorMessage = 'تم تجاوز الحد المسموح لطلبات الربط. يرجى الانتظار ساعة والمحاولة مرة أخرى.';
+          } else if (err?.message?.includes('already been registered')) {
+            errorMessage = 'الدالة مسجلة مسبقاً. يرجى إعادة تشغيل عملية الربط.';
+          }
+          
+          this.emit('pairingComplete', { success: false, error: errorMessage });
         }
-        
-        pairingCodeRequested = false;
-        console.error('All pairing code attempts failed:', lastError?.message);
-        
-        const errorMessage = lastError?.message?.includes('rate') || lastError?.message?.includes('429')
-          ? 'تم تجاوز الحد المسموح لطلبات الربط. يرجى الانتظار ساعة والمحاولة مرة أخرى أو استخدام رمز QR.'
-          : 'فشل الحصول على كود الربط. يرجى المحاولة لاحقاً أو استخدام رمز QR.';
-        
-        this.emit('pairingComplete', { success: false, error: errorMessage });
       }
     });
 
