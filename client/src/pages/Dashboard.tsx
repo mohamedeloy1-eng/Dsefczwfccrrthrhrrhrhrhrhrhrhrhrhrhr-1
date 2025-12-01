@@ -7,8 +7,10 @@ import QRCodeDisplay from "@/components/QRCodeDisplay";
 import ConversationList from "@/components/ConversationList";
 import ChatView from "@/components/ChatView";
 import SettingsPanel from "@/components/SettingsPanel";
+import UserManagement from "@/components/UserManagement";
+import SecurityPanel from "@/components/SecurityPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Settings, QrCode } from "lucide-react";
+import { MessageSquare, Settings, QrCode, Users, Shield } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +39,7 @@ interface BotStatus {
   pairingCode: string | null;
   messagesCount: number;
   usersCount: number;
+  safeModeEnabled?: boolean;
 }
 
 interface BotSettings {
@@ -153,6 +156,30 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
     });
 
+    const unsubUsers = subscribe('users', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/stats/summary'] });
+    });
+
+    const unsubSecurity = subscribe('security', (data: any) => {
+      if (data.type === 'rate_limited' || data.type === 'auto_blocked') {
+        toast({ 
+          title: data.type === 'auto_blocked' ? 'تم الحظر التلقائي' : 'تم تقييد المعدل',
+          description: `${data.phoneNumber}: ${data.reason}`,
+          variant: 'destructive'
+        });
+      }
+    });
+
+    const unsubSafeMode = subscribe('safe_mode', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/security/settings'] });
+    });
+
+    const unsubSecuritySettings = subscribe('security_settings', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/security/settings'] });
+    });
+
     return () => {
       unsubStatus();
       unsubQR();
@@ -160,8 +187,12 @@ export default function Dashboard() {
       unsubMessage();
       unsubStats();
       unsubSettings();
+      unsubUsers();
+      unsubSecurity();
+      unsubSafeMode();
+      unsubSecuritySettings();
     };
-  }, [subscribe]);
+  }, [subscribe, toast]);
 
   const currentStatus = liveStatus || status;
   const isConnected = currentStatus?.isReady || false;
@@ -221,18 +252,26 @@ export default function Dashboard() {
         />
 
         <Tabs defaultValue="conversations" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsList className="grid w-full grid-cols-5 max-w-2xl">
             <TabsTrigger value="conversations" className="gap-2" data-testid="tab-conversations">
               <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Chats</span>
+              <span className="hidden sm:inline">المحادثات</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2" data-testid="tab-users">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">المستخدمين</span>
+            </TabsTrigger>
+            <TabsTrigger value="security" className="gap-2" data-testid="tab-security">
+              <Shield className={`h-4 w-4 ${currentStatus?.safeModeEnabled ? 'text-red-500' : ''}`} />
+              <span className="hidden sm:inline">الأمان</span>
             </TabsTrigger>
             <TabsTrigger value="connection" className="gap-2" data-testid="tab-connection">
               <QrCode className="h-4 w-4" />
-              <span className="hidden sm:inline">Connect</span>
+              <span className="hidden sm:inline">الاتصال</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2" data-testid="tab-settings">
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
+              <span className="hidden sm:inline">الإعدادات</span>
             </TabsTrigger>
           </TabsList>
 
@@ -251,11 +290,19 @@ export default function Dashboard() {
               ) : (
                 <div className="hidden lg:flex items-center justify-center h-[450px] bg-muted/30 rounded-lg">
                   <p className="text-muted-foreground">
-                    {conversationsLoading ? 'Loading conversations...' : 'Select a conversation to view'}
+                    {conversationsLoading ? 'جاري تحميل المحادثات...' : 'اختر محادثة للعرض'}
                   </p>
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="users" className="mt-6">
+            <UserManagement />
+          </TabsContent>
+
+          <TabsContent value="security" className="mt-6">
+            <SecurityPanel safeModeEnabled={currentStatus?.safeModeEnabled || false} />
           </TabsContent>
 
           <TabsContent value="connection" className="mt-6">
