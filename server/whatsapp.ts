@@ -292,12 +292,12 @@ class WhatsAppService extends EventEmitter {
       
       const timeout = setTimeout(() => {
         if (this.pairingResolver) {
-          this.pairingResolver({ success: false, error: 'Pairing request timed out. Please try again.' });
+          this.pairingResolver({ success: false, error: 'انتهت مهلة طلب الربط. يرجى المحاولة مرة أخرى.' });
           this.pairingResolver = null;
           this.pendingPairingNumber = null;
           this.pairingMode = false;
         }
-      }, 60000);
+      }, 90000);
 
       this.once('pairingComplete', (result) => {
         clearTimeout(timeout);
@@ -345,22 +345,52 @@ class WhatsAppService extends EventEmitter {
       },
     });
 
+    let pairingCodeRequested = false;
+    
     this.client.on('qr', async (qr: string) => {
-      console.log('QR received in pairing mode, requesting pairing code...');
+      console.log('QR received in pairing mode');
       
-      if (this.pairingMode && this.pendingPairingNumber) {
-        try {
-          const code = await (this.client as any).requestPairingCode(this.pendingPairingNumber);
-          console.log('Pairing code received:', code);
-          
-          this.status.pairingCode = code;
-          this.emit('pairingCode', code);
-          this.emit('status', this.status);
-          this.emit('pairingComplete', { success: true, code });
-        } catch (err: any) {
-          console.error('Error requesting pairing code:', err);
-          this.emit('pairingComplete', { success: false, error: err?.message || 'Failed to get pairing code' });
+      if (this.pairingMode && this.pendingPairingNumber && !pairingCodeRequested) {
+        pairingCodeRequested = true;
+        
+        console.log('Waiting 6 seconds for WhatsApp Web to fully load...');
+        await new Promise(resolve => setTimeout(resolve, 6000));
+        
+        const maxRetries = 3;
+        let lastError: any = null;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            console.log(`Pairing code request attempt ${attempt}/${maxRetries}...`);
+            
+            const code = await (this.client as any).requestPairingCode(this.pendingPairingNumber, true);
+            console.log('Pairing code received:', code);
+            
+            this.status.pairingCode = code;
+            this.emit('pairingCode', code);
+            this.emit('status', this.status);
+            this.emit('pairingComplete', { success: true, code });
+            return;
+          } catch (err: any) {
+            lastError = err;
+            console.error(`Pairing code attempt ${attempt} failed:`, err?.message || err);
+            
+            if (attempt < maxRetries) {
+              const waitTime = 3000 * attempt;
+              console.log(`Retrying in ${waitTime / 1000} seconds...`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+          }
         }
+        
+        pairingCodeRequested = false;
+        console.error('All pairing code attempts failed:', lastError?.message);
+        
+        const errorMessage = lastError?.message?.includes('rate') || lastError?.message?.includes('429')
+          ? 'تم تجاوز الحد المسموح لطلبات الربط. يرجى الانتظار ساعة والمحاولة مرة أخرى أو استخدام رمز QR.'
+          : 'فشل الحصول على كود الربط. يرجى المحاولة لاحقاً أو استخدام رمز QR.';
+        
+        this.emit('pairingComplete', { success: false, error: errorMessage });
       }
     });
 
