@@ -93,3 +93,58 @@ export interface UserStats {
   spamUsers: number;
   totalMessagesToday: number;
 }
+
+// WhatsApp Contact
+export interface WhatsAppContact {
+  id: string;
+  phoneNumber: string;
+  name: string;
+  pushName: string | null;
+  isMyContact: boolean;
+  isGroup: boolean;
+  lastSeen: string | null;
+  profilePicUrl: string | null;
+}
+
+// WhatsApp Chat (for pinned and recent)
+export interface WhatsAppChat {
+  id: string;
+  phoneNumber: string;
+  name: string;
+  lastMessage: string | null;
+  timestamp: string | null;
+  unreadCount: number;
+  isPinned: boolean;
+  isGroup: boolean;
+  isArchived: boolean;
+  isMuted: boolean;
+}
+
+// Session Info for advanced monitoring
+export interface SessionInfo {
+  connectedNumber: string | null;
+  isOnline: boolean;
+  sessionStartTime: Date | null;
+  sessionDuration: string;
+  whatsappOpenDuration: string;
+  botRepliesCount: number;
+  deviceInfo: DeviceInfo | null;
+  isSuspended: boolean;
+}
+
+// Device info
+export interface DeviceInfo {
+  platform: string;
+  browser: string;
+  version: string;
+  phoneModel: string | null;
+}
+
+// Contacts and Conversations per user
+export interface UserContactsData {
+  phoneNumber: string;
+  contacts: WhatsAppContact[];
+  pinnedChats: WhatsAppChat[];
+  recentChats: WhatsAppChat[];
+  lastUpdated: Date;
+}

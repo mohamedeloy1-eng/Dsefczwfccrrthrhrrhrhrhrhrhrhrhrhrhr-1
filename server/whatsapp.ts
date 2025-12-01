@@ -22,6 +22,47 @@ export interface WhatsAppStatus {
   qrCode: string | null;
   connectedNumber: string | null;
   pairingCode: string | null;
+  isSuspended: boolean;
+}
+
+export interface WhatsAppContactInfo {
+  id: string;
+  phoneNumber: string;
+  name: string;
+  pushName: string | null;
+  isMyContact: boolean;
+  isGroup: boolean;
+  lastSeen: string | null;
+  profilePicUrl: string | null;
+}
+
+export interface WhatsAppChatInfo {
+  id: string;
+  phoneNumber: string;
+  name: string;
+  lastMessage: string | null;
+  timestamp: string | null;
+  unreadCount: number;
+  isPinned: boolean;
+  isGroup: boolean;
+  isArchived: boolean;
+  isMuted: boolean;
+}
+
+export interface SessionDetails {
+  connectedNumber: string | null;
+  isOnline: boolean;
+  sessionStartTime: Date | null;
+  sessionDuration: string;
+  whatsappOpenDuration: string;
+  botRepliesCount: number;
+  deviceInfo: {
+    platform: string;
+    browser: string;
+    version: string;
+    phoneModel: string | null;
+  } | null;
+  isSuspended: boolean;
 }
 
 class WhatsAppService extends EventEmitter {
@@ -32,11 +73,17 @@ class WhatsAppService extends EventEmitter {
     qrCode: null,
     connectedNumber: null,
     pairingCode: null,
+    isSuspended: false,
   };
   private pairingMode: boolean = false;
   private pendingPairingNumber: string | null = null;
   private pairingResolver: ((result: { success: boolean; code?: string; error?: string }) => void) | null = null;
   private messageHandler: ((message: WhatsAppMessage) => Promise<string | null>) | null = null;
+  
+  private sessionStartTime: Date | null = null;
+  private whatsappConnectTime: Date | null = null;
+  private botRepliesCount: number = 0;
+  private isSuspended: boolean = false;
 
   constructor() {
     super();
@@ -97,6 +144,9 @@ class WhatsAppService extends EventEmitter {
       this.status.isReady = true;
       this.status.qrCode = null;
       this.status.pairingCode = null;
+      this.sessionStartTime = new Date();
+      this.whatsappConnectTime = new Date();
+      this.botRepliesCount = 0;
       
       try {
         const info = await this.client!.info;
@@ -263,10 +313,13 @@ class WhatsAppService extends EventEmitter {
           qrCode: null,
           connectedNumber: null,
           pairingCode: null,
+          isSuspended: false,
         };
         this.pairingMode = false;
         this.pendingPairingNumber = null;
         this.pairingResolver = null;
+        this.sessionStartTime = null;
+        this.whatsappConnectTime = null;
         this.emit('status', this.status);
       }
     }
@@ -532,8 +585,12 @@ class WhatsAppService extends EventEmitter {
         qrCode: null,
         connectedNumber: null,
         pairingCode: null,
+        isSuspended: false,
       };
       this.pairingMode = false;
+      this.sessionStartTime = null;
+      this.whatsappConnectTime = null;
+      this.botRepliesCount = 0;
       this.emit('status', this.status);
 
       diagnostics.actions.push('Reinitializing WhatsApp client');
@@ -553,6 +610,151 @@ class WhatsAppService extends EventEmitter {
         diagnostics,
       };
     }
+  }
+
+  incrementBotReplies(): void {
+    this.botRepliesCount++;
+  }
+
+  async getContacts(): Promise<WhatsAppContactInfo[]> {
+    if (!this.client || !this.status.isReady) {
+      return [];
+    }
+
+    try {
+      const contacts = await this.client.getContacts();
+      return contacts
+        .filter(contact => !contact.isGroup && contact.id._serialized !== 'status@broadcast')
+        .map(contact => ({
+          id: contact.id._serialized,
+          phoneNumber: contact.id.user || '',
+          name: contact.name || contact.pushname || `User ${contact.id.user?.slice(-4) || ''}`,
+          pushName: contact.pushname || null,
+          isMyContact: contact.isMyContact || false,
+          isGroup: contact.isGroup || false,
+          lastSeen: null,
+          profilePicUrl: null,
+        }))
+        .slice(0, 100);
+    } catch (err) {
+      console.error('Error fetching contacts:', err);
+      return [];
+    }
+  }
+
+  async getChats(): Promise<WhatsAppChatInfo[]> {
+    if (!this.client || !this.status.isReady) {
+      return [];
+    }
+
+    try {
+      const chats = await this.client.getChats();
+      return chats.map(chat => ({
+        id: chat.id._serialized,
+        phoneNumber: chat.id.user || '',
+        name: chat.name || `Chat ${chat.id.user?.slice(-4) || ''}`,
+        lastMessage: chat.lastMessage?.body || null,
+        timestamp: chat.lastMessage?.timestamp 
+          ? new Date(chat.lastMessage.timestamp * 1000).toLocaleString('ar-EG')
+          : null,
+        unreadCount: chat.unreadCount || 0,
+        isPinned: chat.pinned || false,
+        isGroup: chat.isGroup || false,
+        isArchived: chat.archived || false,
+        isMuted: chat.isMuted || false,
+      }));
+    } catch (err) {
+      console.error('Error fetching chats:', err);
+      return [];
+    }
+  }
+
+  async getPinnedChats(): Promise<WhatsAppChatInfo[]> {
+    const chats = await this.getChats();
+    return chats.filter(chat => chat.isPinned);
+  }
+
+  async getRecentChats(limit: number = 20): Promise<WhatsAppChatInfo[]> {
+    const chats = await this.getChats();
+    return chats
+      .filter(chat => !chat.isArchived)
+      .slice(0, limit);
+  }
+
+  private formatDuration(startTime: Date | null): string {
+    if (!startTime) return '0 دقيقة';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - startTime.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const remainingMins = diffMins % 60;
+
+    if (diffHours > 0) {
+      return `${diffHours} ساعة و ${remainingMins} دقيقة`;
+    }
+    return `${diffMins} دقيقة`;
+  }
+
+  async getSessionDetails(): Promise<SessionDetails> {
+    let deviceInfo = null;
+
+    if (this.client && this.status.isReady) {
+      try {
+        const info = await this.client.info;
+        if (info) {
+          deviceInfo = {
+            platform: info.platform || 'Unknown',
+            browser: 'WhatsApp Web',
+            version: info.pushname || 'Unknown',
+            phoneModel: (info as any).phone?.device_model || null,
+          };
+        }
+      } catch (err) {
+        console.error('Error getting device info:', err);
+      }
+    }
+
+    return {
+      connectedNumber: this.status.connectedNumber,
+      isOnline: this.status.isConnected && this.status.isReady,
+      sessionStartTime: this.sessionStartTime,
+      sessionDuration: this.formatDuration(this.sessionStartTime),
+      whatsappOpenDuration: this.formatDuration(this.whatsappConnectTime),
+      botRepliesCount: this.botRepliesCount,
+      deviceInfo,
+      isSuspended: this.isSuspended,
+    };
+  }
+
+  async suspendSession(): Promise<{ success: boolean; message: string }> {
+    if (!this.status.isConnected) {
+      return { success: false, message: 'لا توجد جلسة متصلة' };
+    }
+
+    this.isSuspended = true;
+    this.status.isSuspended = true;
+    this.emit('status', this.status);
+    this.emit('sessionSuspended', true);
+    
+    return { success: true, message: 'تم تعليق الجلسة بنجاح' };
+  }
+
+  async resumeSession(): Promise<{ success: boolean; message: string }> {
+    if (!this.status.isConnected) {
+      return { success: false, message: 'لا توجد جلسة متصلة' };
+    }
+
+    this.isSuspended = false;
+    this.status.isSuspended = false;
+    this.emit('status', this.status);
+    this.emit('sessionResumed', true);
+    
+    return { success: true, message: 'تم إعادة تفعيل الجلسة بنجاح' };
+  }
+
+  isSessionSuspended(): boolean {
+    return this.isSuspended;
   }
 }
 

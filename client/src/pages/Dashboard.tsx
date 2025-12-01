@@ -9,8 +9,10 @@ import ChatView from "@/components/ChatView";
 import SettingsPanel from "@/components/SettingsPanel";
 import UserManagement from "@/components/UserManagement";
 import SecurityPanel from "@/components/SecurityPanel";
+import ContactsConversations from "@/components/ContactsConversations";
+import SessionMonitor from "@/components/SessionMonitor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Settings, QrCode, Users, Shield } from "lucide-react";
+import { MessageSquare, Settings, QrCode, Users, Shield, Contact, Activity } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 
@@ -180,6 +182,11 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/security/settings'] });
     });
 
+    const unsubSessionStatus = subscribe('session_status', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/session'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/status'] });
+    });
+
     return () => {
       unsubStatus();
       unsubQR();
@@ -191,6 +198,7 @@ export default function Dashboard() {
       unsubSecurity();
       unsubSafeMode();
       unsubSecuritySettings();
+      unsubSessionStatus();
     };
   }, [subscribe, toast]);
 
@@ -252,10 +260,18 @@ export default function Dashboard() {
         />
 
         <Tabs defaultValue="conversations" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-7 max-w-4xl">
             <TabsTrigger value="conversations" className="gap-2" data-testid="tab-conversations">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">المحادثات</span>
+            </TabsTrigger>
+            <TabsTrigger value="contacts" className="gap-2" data-testid="tab-contacts">
+              <Contact className="h-4 w-4" />
+              <span className="hidden sm:inline">جهات الاتصال</span>
+            </TabsTrigger>
+            <TabsTrigger value="session" className="gap-2" data-testid="tab-session">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">الجلسة</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2" data-testid="tab-users">
               <Users className="h-4 w-4" />
@@ -295,6 +311,14 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="contacts" className="mt-6">
+            <ContactsConversations />
+          </TabsContent>
+
+          <TabsContent value="session" className="mt-6">
+            <SessionMonitor />
           </TabsContent>
 
           <TabsContent value="users" className="mt-6">

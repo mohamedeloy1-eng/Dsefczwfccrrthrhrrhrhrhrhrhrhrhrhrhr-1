@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { whatsappService, type WhatsAppMessage } from "./whatsapp";
+import { whatsappService, type WhatsAppMessage, type WhatsAppContactInfo, type WhatsAppChatInfo, type SessionDetails } from "./whatsapp";
 import { generateResponse, generateImage, updateSettings, getSettings, clearConversationHistory, clearAllConversations } from "./openai";
 import { conversationStore } from "./conversationStore";
 import { userStore } from "./userStore";
@@ -95,6 +95,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   whatsappService.setMessageHandler(async (message: WhatsAppMessage) => {
+    if (whatsappService.isSessionSuspended()) {
+      console.log('Session is suspended, not responding to message');
+      return null;
+    }
+
     const user = userStore.getOrCreateUser(message.from);
     const sessionId = user.sessionId || 'unknown';
 
@@ -214,6 +219,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           true,
           timestamp
         );
+
+        whatsappService.incrementBotReplies();
 
         logStore.logOutgoingMessage(
           message.from,
@@ -612,6 +619,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/logs/clear/:phoneNumber', (req, res) => {
     logStore.clearLogsByPhone(req.params.phoneNumber);
     res.json({ success: true });
+  });
+
+  app.get('/api/whatsapp/contacts', async (req, res) => {
+    try {
+      const contacts = await whatsappService.getContacts();
+      res.json(contacts);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Failed to fetch contacts' });
+    }
+  });
+
+  app.get('/api/whatsapp/chats', async (req, res) => {
+    try {
+      const chats = await whatsappService.getChats();
+      res.json(chats);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Failed to fetch chats' });
+    }
+  });
+
+  app.get('/api/whatsapp/chats/pinned', async (req, res) => {
+    try {
+      const pinnedChats = await whatsappService.getPinnedChats();
+      res.json(pinnedChats);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Failed to fetch pinned chats' });
+    }
+  });
+
+  app.get('/api/whatsapp/chats/recent', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const recentChats = await whatsappService.getRecentChats(limit);
+      res.json(recentChats);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Failed to fetch recent chats' });
+    }
+  });
+
+  app.get('/api/whatsapp/session', async (req, res) => {
+    try {
+      const sessionDetails = await whatsappService.getSessionDetails();
+      res.json(sessionDetails);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Failed to fetch session details' });
+    }
+  });
+
+  app.post('/api/whatsapp/session/suspend', async (req, res) => {
+    try {
+      const result = await whatsappService.suspendSession();
+      if (result.success) {
+        broadcast({ type: 'session_status', data: { suspended: true } });
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error?.message || 'Failed to suspend session' });
+    }
+  });
+
+  app.post('/api/whatsapp/session/resume', async (req, res) => {
+    try {
+      const result = await whatsappService.resumeSession();
+      if (result.success) {
+        broadcast({ type: 'session_status', data: { suspended: false } });
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error?.message || 'Failed to resume session' });
+    }
+  });
+
+  app.get('/api/whatsapp/contacts-data', async (req, res) => {
+    try {
+      const status = whatsappService.getStatus();
+      if (!status.isConnected || !status.isReady) {
+        return res.json({
+          phoneNumber: null,
+          contacts: [],
+          pinnedChats: [],
+          recentChats: [],
+          lastUpdated: new Date(),
+        });
+      }
+
+      const [contacts, pinnedChats, recentChats] = await Promise.all([
+        whatsappService.getContacts(),
+        whatsappService.getPinnedChats(),
+        whatsappService.getRecentChats(30),
+      ]);
+
+      res.json({
+        phoneNumber: status.connectedNumber,
+        contacts,
+        pinnedChats,
+        recentChats,
+        lastUpdated: new Date(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || 'Failed to fetch contacts data' });
+    }
   });
 
   return httpServer;
