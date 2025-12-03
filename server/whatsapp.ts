@@ -6,6 +6,8 @@ import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
 import https from 'https';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 
 export interface WhatsAppMessage {
   id: string;
@@ -14,6 +16,7 @@ export interface WhatsAppMessage {
   body: string;
   timestamp: number;
   isFromMe: boolean;
+  sessionId?: string;
 }
 
 export interface WhatsAppStatus {
@@ -65,9 +68,20 @@ export interface SessionDetails {
   isSuspended: boolean;
 }
 
-class WhatsAppService extends EventEmitter {
-  private client: ClientType | null = null;
-  private status: WhatsAppStatus = {
+export interface LinkedSession {
+  id: string;
+  phoneNumber: string;
+  isConnected: boolean;
+  isReady: boolean;
+  sessionStartTime: Date | null;
+  botRepliesCount: number;
+  isSuspended: boolean;
+}
+
+class WhatsAppSession extends EventEmitter {
+  public client: ClientType | null = null;
+  public sessionId: string;
+  public status: WhatsAppStatus = {
     isConnected: false,
     isReady: false,
     qrCode: null,
@@ -75,31 +89,34 @@ class WhatsAppService extends EventEmitter {
     pairingCode: null,
     isSuspended: false,
   };
+  public sessionStartTime: Date | null = null;
+  public whatsappConnectTime: Date | null = null;
+  public botRepliesCount: number = 0;
+  public isSuspended: boolean = false;
   private pairingMode: boolean = false;
   private pendingPairingNumber: string | null = null;
   private pairingResolver: ((result: { success: boolean; code?: string; error?: string }) => void) | null = null;
   private messageHandler: ((message: WhatsAppMessage) => Promise<string | null>) | null = null;
-  
-  private sessionStartTime: Date | null = null;
-  private whatsappConnectTime: Date | null = null;
-  private botRepliesCount: number = 0;
-  private isSuspended: boolean = false;
 
-  constructor() {
+  constructor(sessionId: string) {
     super();
+    this.sessionId = sessionId;
   }
 
   async initialize(): Promise<void> {
     if (this.client) {
-      console.log('WhatsApp client already initialized');
+      console.log(`WhatsApp session ${this.sessionId} already initialized`);
       return;
     }
 
-    console.log('Initializing WhatsApp client...');
+    console.log(`Initializing WhatsApp session ${this.sessionId}...`);
+    
+    const authPath = `./.wwebjs_auth/session-${this.sessionId}`;
     
     this.client = new Client({
       authStrategy: new LocalAuth({
         dataPath: './.wwebjs_auth',
+        clientId: this.sessionId,
       }),
       puppeteer: {
         headless: true,
@@ -121,8 +138,21 @@ class WhatsAppService extends EventEmitter {
       },
     });
 
+    this.setupEventListeners();
+
+    try {
+      await this.client.initialize();
+    } catch (err) {
+      console.error(`Error initializing WhatsApp session ${this.sessionId}:`, err);
+      throw err;
+    }
+  }
+
+  private setupEventListeners(): void {
+    if (!this.client) return;
+
     this.client.on('qr', async (qr: string) => {
-      console.log('QR Code received');
+      console.log(`QR Code received for session ${this.sessionId}`);
       try {
         const qrDataUrl = await QRCode.toDataURL(qr, {
           width: 256,
@@ -139,7 +169,7 @@ class WhatsAppService extends EventEmitter {
     });
 
     this.client.on('ready', async () => {
-      console.log('WhatsApp client is ready!');
+      console.log(`WhatsApp session ${this.sessionId} is ready!`);
       this.status.isConnected = true;
       this.status.isReady = true;
       this.status.qrCode = null;
@@ -152,7 +182,7 @@ class WhatsAppService extends EventEmitter {
         const info = await this.client!.info;
         if (info && info.wid) {
           this.status.connectedNumber = info.wid.user;
-          console.log('Connected number:', this.status.connectedNumber);
+          console.log(`Session ${this.sessionId} connected number:`, this.status.connectedNumber);
         }
       } catch (err) {
         console.error('Error getting client info:', err);
@@ -163,13 +193,13 @@ class WhatsAppService extends EventEmitter {
     });
 
     this.client.on('authenticated', () => {
-      console.log('WhatsApp client authenticated');
+      console.log(`WhatsApp session ${this.sessionId} authenticated`);
       this.status.isConnected = true;
       this.emit('authenticated');
     });
 
     this.client.on('auth_failure', (msg: string) => {
-      console.error('WhatsApp authentication failed:', msg);
+      console.error(`WhatsApp session ${this.sessionId} authentication failed:`, msg);
       this.status.isConnected = false;
       this.status.isReady = false;
       this.emit('auth_failure', msg);
@@ -177,7 +207,7 @@ class WhatsAppService extends EventEmitter {
     });
 
     this.client.on('disconnected', (reason: string) => {
-      console.log('WhatsApp client disconnected:', reason);
+      console.log(`WhatsApp session ${this.sessionId} disconnected:`, reason);
       this.status.isConnected = false;
       this.status.isReady = false;
       this.status.qrCode = null;
@@ -188,7 +218,7 @@ class WhatsAppService extends EventEmitter {
     });
 
     this.client.on('message', async (message: Message) => {
-      console.log('Message received from:', message.from);
+      console.log(`Message received on session ${this.sessionId} from:`, message.from);
       
       const whatsappMessage: WhatsAppMessage = {
         id: message.id._serialized,
@@ -197,6 +227,7 @@ class WhatsAppService extends EventEmitter {
         body: message.body,
         timestamp: message.timestamp,
         isFromMe: message.fromMe,
+        sessionId: this.sessionId,
       };
 
       this.emit('message', whatsappMessage);
@@ -207,19 +238,13 @@ class WhatsAppService extends EventEmitter {
           if (response) {
             await message.reply(response);
             console.log('Replied to message');
+            this.botRepliesCount++;
           }
         } catch (err) {
           console.error('Error handling message:', err);
         }
       }
     });
-
-    try {
-      await this.client.initialize();
-    } catch (err) {
-      console.error('Error initializing WhatsApp client:', err);
-      throw err;
-    }
   }
 
   setMessageHandler(handler: (message: WhatsAppMessage) => Promise<string | null>): void {
@@ -304,7 +329,7 @@ class WhatsAppService extends EventEmitter {
       try {
         await this.client.destroy();
       } catch (err) {
-        console.error('Error disconnecting WhatsApp client:', err);
+        console.error(`Error disconnecting WhatsApp session ${this.sessionId}:`, err);
       } finally {
         this.client = null;
         this.status = {
@@ -327,7 +352,7 @@ class WhatsAppService extends EventEmitter {
 
   async requestPairingCode(phoneNumber: string): Promise<{ success: boolean; code?: string; error?: string }> {
     const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
-    console.log('Requesting pairing code for:', formattedNumber);
+    console.log(`Requesting pairing code for session ${this.sessionId}:`, formattedNumber);
     
     if (this.client && this.status.isConnected) {
       return { success: false, error: 'Already connected to WhatsApp' };
@@ -372,11 +397,12 @@ class WhatsAppService extends EventEmitter {
       return;
     }
 
-    console.log('Initializing WhatsApp client for pairing...');
+    console.log(`Initializing WhatsApp session ${this.sessionId} for pairing...`);
     
     this.client = new Client({
       authStrategy: new LocalAuth({
         dataPath: './.wwebjs_auth',
+        clientId: this.sessionId,
       }),
       puppeteer: {
         headless: true,
@@ -458,13 +484,16 @@ class WhatsAppService extends EventEmitter {
     });
 
     this.client.on('ready', async () => {
-      console.log('WhatsApp client is ready (pairing mode)!');
+      console.log(`WhatsApp session ${this.sessionId} is ready (pairing mode)!`);
       this.status.isConnected = true;
       this.status.isReady = true;
       this.status.qrCode = null;
       this.status.pairingCode = null;
       this.pendingPairingNumber = null;
       this.pairingResolver = null;
+      this.sessionStartTime = new Date();
+      this.whatsappConnectTime = new Date();
+      this.botRepliesCount = 0;
       
       try {
         const info = await this.client!.info;
@@ -482,13 +511,13 @@ class WhatsAppService extends EventEmitter {
     });
 
     this.client.on('authenticated', () => {
-      console.log('WhatsApp client authenticated (pairing mode)');
+      console.log(`WhatsApp session ${this.sessionId} authenticated (pairing mode)`);
       this.status.isConnected = true;
       this.emit('authenticated');
     });
 
     this.client.on('auth_failure', (msg: string) => {
-      console.error('WhatsApp authentication failed (pairing mode):', msg);
+      console.error(`WhatsApp session ${this.sessionId} authentication failed (pairing mode):`, msg);
       this.status.isConnected = false;
       this.status.isReady = false;
       this.pairingMode = false;
@@ -499,7 +528,7 @@ class WhatsAppService extends EventEmitter {
     });
 
     this.client.on('disconnected', (reason: string) => {
-      console.log('WhatsApp client disconnected (pairing mode):', reason);
+      console.log(`WhatsApp session ${this.sessionId} disconnected (pairing mode):`, reason);
       this.status.isConnected = false;
       this.status.isReady = false;
       this.status.qrCode = null;
@@ -520,6 +549,7 @@ class WhatsAppService extends EventEmitter {
         body: message.body,
         timestamp: message.timestamp,
         isFromMe: message.fromMe,
+        sessionId: this.sessionId,
       };
 
       this.emit('message', whatsappMessage);
@@ -530,6 +560,7 @@ class WhatsAppService extends EventEmitter {
           if (response) {
             await message.reply(response);
             console.log('Replied to message');
+            this.botRepliesCount++;
           }
         } catch (err) {
           console.error('Error handling message:', err);
@@ -540,7 +571,7 @@ class WhatsAppService extends EventEmitter {
     try {
       await this.client.initialize();
     } catch (err) {
-      console.error('Error initializing WhatsApp client for pairing:', err);
+      console.error(`Error initializing WhatsApp session ${this.sessionId} for pairing:`, err);
       throw err;
     }
   }
@@ -555,67 +586,6 @@ class WhatsAppService extends EventEmitter {
     await this.initialize();
   }
 
-  async repair(): Promise<{ success: boolean; message: string; diagnostics: any }> {
-    const diagnostics: any = {
-      timestamp: new Date().toISOString(),
-      status: { ...this.status },
-      checks: [],
-      actions: [],
-    };
-
-    try {
-      diagnostics.checks.push({ name: 'Client Status', result: this.client ? 'Exists' : 'Null' });
-      diagnostics.checks.push({ name: 'Connection', result: this.status.isConnected ? 'Connected' : 'Disconnected' });
-      diagnostics.checks.push({ name: 'Ready', result: this.status.isReady ? 'Ready' : 'Not Ready' });
-
-      if (this.client && !this.status.isConnected) {
-        diagnostics.actions.push('Destroying stale client');
-        try {
-          await this.client.destroy();
-        } catch (e) {
-          diagnostics.actions.push('Client destroy failed (expected if already dead)');
-        }
-        this.client = null;
-      }
-
-      diagnostics.actions.push('Resetting status');
-      this.status = {
-        isConnected: false,
-        isReady: false,
-        qrCode: null,
-        connectedNumber: null,
-        pairingCode: null,
-        isSuspended: false,
-      };
-      this.pairingMode = false;
-      this.sessionStartTime = null;
-      this.whatsappConnectTime = null;
-      this.botRepliesCount = 0;
-      this.emit('status', this.status);
-
-      diagnostics.actions.push('Reinitializing WhatsApp client');
-      await this.initialize();
-
-      diagnostics.actions.push('Repair completed successfully');
-      return {
-        success: true,
-        message: 'تم إصلاح الاتصال بنجاح - Repair completed successfully',
-        diagnostics,
-      };
-    } catch (error: any) {
-      diagnostics.actions.push(`Error during repair: ${error?.message || 'Unknown error'}`);
-      return {
-        success: false,
-        message: `فشل الإصلاح: ${error?.message || 'Unknown error'}`,
-        diagnostics,
-      };
-    }
-  }
-
-  incrementBotReplies(): void {
-    this.botRepliesCount++;
-  }
-
   async getContacts(): Promise<WhatsAppContactInfo[]> {
     if (!this.client || !this.status.isReady) {
       return [];
@@ -625,17 +595,21 @@ class WhatsAppService extends EventEmitter {
       const contacts = await this.client.getContacts();
       return contacts
         .filter(contact => !contact.isGroup && contact.id._serialized !== 'status@broadcast')
-        .map(contact => ({
-          id: contact.id._serialized,
-          phoneNumber: contact.id.user || '',
-          name: contact.name || contact.pushname || `User ${contact.id.user?.slice(-4) || ''}`,
-          pushName: contact.pushname || null,
-          isMyContact: contact.isMyContact || false,
-          isGroup: contact.isGroup || false,
-          lastSeen: null,
-          profilePicUrl: null,
-        }))
-        .slice(0, 100);
+        .map(contact => {
+          const phoneNumber = contact.id.user || '';
+          const displayName = contact.name || contact.pushname || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+          return {
+            id: contact.id._serialized,
+            phoneNumber: phoneNumber,
+            name: displayName,
+            pushName: contact.pushname || null,
+            isMyContact: contact.isMyContact || false,
+            isGroup: contact.isGroup || false,
+            lastSeen: null,
+            profilePicUrl: null,
+          };
+        })
+        .slice(0, 200);
     } catch (err) {
       console.error('Error fetching contacts:', err);
       return [];
@@ -649,20 +623,24 @@ class WhatsAppService extends EventEmitter {
 
     try {
       const chats = await this.client.getChats();
-      return chats.map(chat => ({
-        id: chat.id._serialized,
-        phoneNumber: chat.id.user || '',
-        name: chat.name || `Chat ${chat.id.user?.slice(-4) || ''}`,
-        lastMessage: chat.lastMessage?.body || null,
-        timestamp: chat.lastMessage?.timestamp 
-          ? new Date(chat.lastMessage.timestamp * 1000).toLocaleString('ar-EG')
-          : null,
-        unreadCount: chat.unreadCount || 0,
-        isPinned: chat.pinned || false,
-        isGroup: chat.isGroup || false,
-        isArchived: chat.archived || false,
-        isMuted: chat.isMuted || false,
-      }));
+      return chats.map(chat => {
+        const phoneNumber = chat.id.user || '';
+        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : `Chat`);
+        return {
+          id: chat.id._serialized,
+          phoneNumber: phoneNumber,
+          name: displayName,
+          lastMessage: chat.lastMessage?.body || null,
+          timestamp: chat.lastMessage?.timestamp 
+            ? new Date(chat.lastMessage.timestamp * 1000).toLocaleString('ar-EG')
+            : null,
+          unreadCount: chat.unreadCount || 0,
+          isPinned: chat.pinned || false,
+          isGroup: chat.isGroup || false,
+          isArchived: chat.archived || false,
+          isMuted: chat.isMuted || false,
+        };
+      });
     } catch (err) {
       console.error('Error fetching chats:', err);
       return [];
@@ -755,6 +733,323 @@ class WhatsAppService extends EventEmitter {
 
   isSessionSuspended(): boolean {
     return this.isSuspended;
+  }
+
+  incrementBotReplies(): void {
+    this.botRepliesCount++;
+  }
+
+  getLinkedSessionInfo(): LinkedSession {
+    return {
+      id: this.sessionId,
+      phoneNumber: this.status.connectedNumber || '',
+      isConnected: this.status.isConnected,
+      isReady: this.status.isReady,
+      sessionStartTime: this.sessionStartTime,
+      botRepliesCount: this.botRepliesCount,
+      isSuspended: this.isSuspended,
+    };
+  }
+}
+
+class WhatsAppService extends EventEmitter {
+  private sessions: Map<string, WhatsAppSession> = new Map();
+  private activeSessionId: string = 'default';
+  private messageHandler: ((message: WhatsAppMessage) => Promise<string | null>) | null = null;
+
+  constructor() {
+    super();
+  }
+
+  private getOrCreateSession(sessionId: string = 'default'): WhatsAppSession {
+    if (!this.sessions.has(sessionId)) {
+      const session = new WhatsAppSession(sessionId);
+      
+      session.on('status', (status) => {
+        this.emit('status', { ...status, sessionId });
+      });
+      
+      session.on('qr', (qrCode) => {
+        this.emit('qr', qrCode);
+      });
+      
+      session.on('pairingCode', (code) => {
+        this.emit('pairingCode', code);
+      });
+      
+      session.on('message', (message) => {
+        this.emit('message', message);
+      });
+      
+      session.on('ready', () => {
+        this.emit('ready', sessionId);
+      });
+      
+      session.on('disconnected', (reason) => {
+        this.emit('disconnected', { sessionId, reason });
+      });
+
+      if (this.messageHandler) {
+        session.setMessageHandler(this.messageHandler);
+      }
+      
+      this.sessions.set(sessionId, session);
+    }
+    return this.sessions.get(sessionId)!;
+  }
+
+  private getActiveSession(): WhatsAppSession | null {
+    return this.sessions.get(this.activeSessionId) || null;
+  }
+
+  async initialize(sessionId?: string): Promise<void> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.getOrCreateSession(id);
+    await session.initialize();
+  }
+
+  async createNewSession(): Promise<string> {
+    const sessionId = `session_${Date.now()}`;
+    const session = this.getOrCreateSession(sessionId);
+    await session.initialize();
+    return sessionId;
+  }
+
+  async terminateSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return { success: false, message: 'الجلسة غير موجودة' };
+    }
+
+    try {
+      await session.disconnect();
+      this.sessions.delete(sessionId);
+      
+      const authPath = path.join('./.wwebjs_auth', `session-${sessionId}`);
+      if (fs.existsSync(authPath)) {
+        fs.rmSync(authPath, { recursive: true, force: true });
+      }
+      
+      this.emit('sessionTerminated', sessionId);
+      return { success: true, message: 'تم إنهاء الجلسة وحذف بياناتها بنجاح' };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'فشل في إنهاء الجلسة' };
+    }
+  }
+
+  getLinkedSessions(): LinkedSession[] {
+    const sessions: LinkedSession[] = [];
+    this.sessions.forEach((session, id) => {
+      if (session.status.isConnected || session.status.isReady) {
+        sessions.push(session.getLinkedSessionInfo());
+      }
+    });
+    return sessions;
+  }
+
+  getAllSessions(): LinkedSession[] {
+    const sessions: LinkedSession[] = [];
+    this.sessions.forEach((session) => {
+      sessions.push(session.getLinkedSessionInfo());
+    });
+    return sessions;
+  }
+
+  setActiveSession(sessionId: string): boolean {
+    if (this.sessions.has(sessionId)) {
+      this.activeSessionId = sessionId;
+      return true;
+    }
+    return false;
+  }
+
+  setMessageHandler(handler: (message: WhatsAppMessage) => Promise<string | null>): void {
+    this.messageHandler = handler;
+    this.sessions.forEach(session => {
+      session.setMessageHandler(handler);
+    });
+  }
+
+  getStatus(sessionId?: string): WhatsAppStatus {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.getStatus();
+    }
+    return {
+      isConnected: false,
+      isReady: false,
+      qrCode: null,
+      connectedNumber: null,
+      pairingCode: null,
+      isSuspended: false,
+    };
+  }
+
+  async sendMessage(to: string, message: string, sessionId?: string): Promise<boolean> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.sendMessage(to, message);
+    }
+    return false;
+  }
+
+  async sendImage(to: string, imageUrl: string, asSticker: boolean = false, sessionId?: string): Promise<boolean> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.sendImage(to, imageUrl, asSticker);
+    }
+    return false;
+  }
+
+  async disconnect(sessionId?: string): Promise<void> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      await session.disconnect();
+    }
+  }
+
+  async requestPairingCode(phoneNumber: string, sessionId?: string): Promise<{ success: boolean; code?: string; error?: string }> {
+    const id = sessionId || `pairing_${Date.now()}`;
+    const session = this.getOrCreateSession(id);
+    this.activeSessionId = id;
+    return session.requestPairingCode(phoneNumber);
+  }
+
+  async refreshQR(sessionId?: string): Promise<void> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.getOrCreateSession(id);
+    await session.refreshQR();
+  }
+
+  async repair(sessionId?: string): Promise<{ success: boolean; message: string; diagnostics: any }> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    
+    const diagnostics: any = {
+      timestamp: new Date().toISOString(),
+      sessionId: id,
+      checks: [],
+      actions: [],
+    };
+
+    try {
+      if (session) {
+        diagnostics.checks.push({ name: 'Session Status', result: session.status.isConnected ? 'Connected' : 'Disconnected' });
+        diagnostics.actions.push('Disconnecting existing session');
+        await session.disconnect();
+        this.sessions.delete(id);
+      }
+
+      diagnostics.actions.push('Creating new session');
+      await this.initialize(id);
+
+      diagnostics.actions.push('Repair completed successfully');
+      return {
+        success: true,
+        message: 'تم إصلاح الاتصال بنجاح - Repair completed successfully',
+        diagnostics,
+      };
+    } catch (error: any) {
+      diagnostics.actions.push(`Error during repair: ${error?.message || 'Unknown error'}`);
+      return {
+        success: false,
+        message: `فشل الإصلاح: ${error?.message || 'Unknown error'}`,
+        diagnostics,
+      };
+    }
+  }
+
+  incrementBotReplies(sessionId?: string): void {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      session.incrementBotReplies();
+    }
+  }
+
+  async getContacts(sessionId?: string): Promise<WhatsAppContactInfo[]> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.getContacts();
+    }
+    return [];
+  }
+
+  async getChats(sessionId?: string): Promise<WhatsAppChatInfo[]> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.getChats();
+    }
+    return [];
+  }
+
+  async getPinnedChats(sessionId?: string): Promise<WhatsAppChatInfo[]> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.getPinnedChats();
+    }
+    return [];
+  }
+
+  async getRecentChats(limit: number = 20, sessionId?: string): Promise<WhatsAppChatInfo[]> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.getRecentChats(limit);
+    }
+    return [];
+  }
+
+  async getSessionDetails(sessionId?: string): Promise<SessionDetails> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.getSessionDetails();
+    }
+    return {
+      connectedNumber: null,
+      isOnline: false,
+      sessionStartTime: null,
+      sessionDuration: '0 دقيقة',
+      whatsappOpenDuration: '0 دقيقة',
+      botRepliesCount: 0,
+      deviceInfo: null,
+      isSuspended: false,
+    };
+  }
+
+  async suspendSession(sessionId?: string): Promise<{ success: boolean; message: string }> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.suspendSession();
+    }
+    return { success: false, message: 'الجلسة غير موجودة' };
+  }
+
+  async resumeSession(sessionId?: string): Promise<{ success: boolean; message: string }> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.resumeSession();
+    }
+    return { success: false, message: 'الجلسة غير موجودة' };
+  }
+
+  isSessionSuspended(sessionId?: string): boolean {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.isSessionSuspended();
+    }
+    return false;
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { whatsappService, type WhatsAppMessage, type WhatsAppContactInfo, type WhatsAppChatInfo, type SessionDetails } from "./whatsapp";
+import { whatsappService, type WhatsAppMessage, type WhatsAppContactInfo, type WhatsAppChatInfo, type SessionDetails, type LinkedSession } from "./whatsapp";
 import { generateResponse, generateImage, updateSettings, getSettings, clearConversationHistory, clearAllConversations } from "./openai";
 import { conversationStore } from "./conversationStore";
 import { userStore } from "./userStore";
@@ -44,8 +44,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
-  whatsappService.on('status', () => {
+  whatsappService.on('status', (statusData) => {
     const status = whatsappService.getStatus();
+    
+    if (statusData?.sessionId && statusData.isReady) {
+      conversationStore.setDefaultSessionId(statusData.sessionId);
+      userStore.setDefaultSessionId(statusData.sessionId);
+    }
+    
     broadcast({ 
       type: 'status', 
       data: {
@@ -55,6 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         safeModeEnabled: userStore.isSafeModeEnabled(),
       }
     });
+    broadcast({ type: 'sessions', data: whatsappService.getLinkedSessions() });
   });
 
   whatsappService.on('qr', (qrCode: string) => {
@@ -65,20 +72,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcast({ type: 'pairingCode', data: code });
   });
 
+  whatsappService.on('sessionTerminated', (sessionId: string) => {
+    broadcast({ type: 'sessionTerminated', data: { sessionId } });
+    broadcast({ type: 'sessions', data: whatsappService.getLinkedSessions() });
+  });
+
   whatsappService.on('message', (message: WhatsAppMessage) => {
-    const user = userStore.getOrCreateUser(message.from);
-    userStore.recordMessage(message.from, message.isFromMe);
+    const sessionId = message.sessionId || 'default';
+    const user = userStore.getOrCreateUser(message.from, sessionId);
+    userStore.recordMessage(message.from, message.isFromMe, sessionId);
     
     const conversation = conversationStore.addMessage(
       message.from,
       message.body,
       message.isFromMe,
-      message.timestamp
+      message.timestamp,
+      sessionId
     );
 
     logStore.logIncomingMessage(
       message.from,
-      user.sessionId || 'unknown',
+      sessionId,
       message.body,
       'success'
     );
@@ -95,15 +109,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   whatsappService.setMessageHandler(async (message: WhatsAppMessage) => {
-    if (whatsappService.isSessionSuspended()) {
+    const sessionId = message.sessionId || 'default';
+    
+    if (whatsappService.isSessionSuspended(sessionId)) {
       console.log('Session is suspended, not responding to message');
       return null;
     }
 
-    const user = userStore.getOrCreateUser(message.from);
-    const sessionId = user.sessionId || 'unknown';
+    const user = userStore.getOrCreateUser(message.from, sessionId);
 
-    const rateLimitCheck = userStore.checkRateLimit(message.from);
+    const rateLimitCheck = userStore.checkRateLimit(message.from, sessionId);
     if (!rateLimitCheck.allowed) {
       logStore.logIncomingMessage(
         message.from,
@@ -164,11 +179,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (result.success && result.imageUrl) {
           try {
-            const sent = await whatsappService.sendImage(message.from, result.imageUrl, isSticker);
+            const sent = await whatsappService.sendImage(message.from, result.imageUrl, isSticker, sessionId);
             if (sent) {
               const successMsg = isSticker ? '✅ تم إرسال الاستيكر بنجاح!' : '✅ تم إرسال الصورة بنجاح!';
               const timestamp = Math.floor(Date.now() / 1000);
-              conversationStore.addMessage(message.from, successMsg, true, timestamp);
+              conversationStore.addMessage(message.from, successMsg, true, timestamp, sessionId);
               
               logStore.logOutgoingMessage(
                 message.from,
@@ -178,18 +193,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 'success'
               );
 
-              broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from) } });
+              broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
               return null;
             } else {
               const errorMsg = `❌ فشل في إرسال ${isSticker ? 'الاستيكر' : 'الصورة'}. حاول مرة أخرى.`;
-              userStore.recordError(message.from, errorMsg);
+              userStore.recordError(message.from, errorMsg, sessionId);
               logStore.logError(message.from, sessionId, errorMsg);
               return errorMsg;
             }
           } catch (err) {
             console.error('Error sending image:', err);
             const errorMsg = `❌ فشل في إرسال ${isSticker ? 'الاستيكر' : 'الصورة'}. حاول مرة أخرى.`;
-            const errorResult = userStore.recordError(message.from, errorMsg);
+            const errorResult = userStore.recordError(message.from, errorMsg, sessionId);
             logStore.logError(message.from, sessionId, errorMsg);
 
             if (errorResult.shouldBlock) {
@@ -204,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } else {
           const errorMsg = `❌ ${result.error || 'فشل في إنشاء الصورة. حاول مرة أخرى.'}`;
-          userStore.recordError(message.from, errorMsg);
+          userStore.recordError(message.from, errorMsg, sessionId);
           logStore.logError(message.from, sessionId, errorMsg);
           return errorMsg;
         }
@@ -217,10 +232,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message.from,
           response,
           true,
-          timestamp
+          timestamp,
+          sessionId
         );
 
-        whatsappService.incrementBotReplies();
+        whatsappService.incrementBotReplies(sessionId);
 
         logStore.logOutgoingMessage(
           message.from,
@@ -243,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Error in message handler:', error);
       const errorMsg = 'عذراً، حدث خطأ. حاول مرة أخرى.';
-      const errorResult = userStore.recordError(message.from, error?.message || 'Unknown error');
+      const errorResult = userStore.recordError(message.from, error?.message || 'Unknown error', sessionId);
       logStore.logError(message.from, sessionId, error?.message || 'Unknown error');
 
       if (errorResult.shouldBlock) {
@@ -283,7 +299,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/disconnect', async (req, res) => {
     try {
-      await whatsappService.disconnect();
+      const sessionId = req.body?.sessionId;
+      await whatsappService.disconnect(sessionId);
       res.json({ success: true, message: 'Disconnected from WhatsApp' });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message || 'Failed to disconnect' });
@@ -292,7 +309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/refresh-qr', async (req, res) => {
     try {
-      await whatsappService.refreshQR();
+      const sessionId = req.body?.sessionId;
+      await whatsappService.refreshQR(sessionId);
       res.json({ success: true, message: 'Refreshing QR code...' });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message || 'Failed to refresh QR' });
@@ -301,7 +319,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/repair', async (req, res) => {
     try {
-      const result = await whatsappService.repair();
+      const sessionId = req.body?.sessionId;
+      const result = await whatsappService.repair(sessionId);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ 
@@ -314,12 +333,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/request-pairing-code', async (req, res) => {
     try {
-      const { phoneNumber } = req.body;
+      const { phoneNumber, sessionId } = req.body;
       if (!phoneNumber) {
         return res.status(400).json({ success: false, error: 'Phone number is required' });
       }
       
-      const result = await whatsappService.requestPairingCode(phoneNumber);
+      const result = await whatsappService.requestPairingCode(phoneNumber, sessionId);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ 
@@ -329,15 +348,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/sessions/create', async (req, res) => {
+    try {
+      if (userStore.isSafeModeEnabled()) {
+        return res.status(403).json({ success: false, error: 'Cannot create session while Safe Mode is enabled.' });
+      }
+      const sessionId = await whatsappService.createNewSession();
+      res.json({ success: true, sessionId, message: 'New session created' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message || 'Failed to create session' });
+    }
+  });
+
+  app.post('/api/sessions/:sessionId/terminate', async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const result = await whatsappService.terminateSession(sessionId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error?.message || 'Failed to terminate session' });
+    }
+  });
+
+  app.get('/api/sessions', (req, res) => {
+    const sessions = whatsappService.getLinkedSessions();
+    res.json(sessions);
+  });
+
+  app.get('/api/sessions/all', (req, res) => {
+    const sessions = whatsappService.getAllSessions();
+    res.json(sessions);
+  });
+
+  app.post('/api/sessions/:sessionId/set-active', (req, res) => {
+    const { sessionId } = req.params;
+    const success = whatsappService.setActiveSession(sessionId);
+    if (success) {
+      conversationStore.setDefaultSessionId(sessionId);
+      userStore.setDefaultSessionId(sessionId);
+      res.json({ success: true, message: 'Active session changed' });
+    } else {
+      res.status(404).json({ success: false, message: 'Session not found' });
+    }
+  });
+
   app.get('/api/conversations', (req, res) => {
-    const conversations = conversationStore.getAllConversations();
+    const sessionId = req.query.sessionId as string | undefined;
+    const conversations = sessionId 
+      ? conversationStore.getAllConversations(sessionId)
+      : conversationStore.getAllSessionsConversations();
     res.json(conversations);
   });
 
   app.get('/api/conversations/:phoneNumber', (req, res) => {
-    const conversation = conversationStore.getConversation(req.params.phoneNumber);
+    const sessionId = req.query.sessionId as string | undefined;
+    const conversation = conversationStore.getConversation(req.params.phoneNumber, sessionId);
     if (conversation) {
-      conversationStore.markAsRead(req.params.phoneNumber);
+      conversationStore.markAsRead(req.params.phoneNumber, sessionId);
       res.json(conversation);
     } else {
       res.status(404).json({ error: 'Conversation not found' });
@@ -349,7 +416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ error: 'Cannot send messages while Safe Mode is enabled' });
     }
 
-    const { message } = req.body;
+    const { message, sessionId } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
@@ -357,7 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const phoneNumber = req.params.phoneNumber + '@c.us';
     
     try {
-      const success = await whatsappService.sendMessage(phoneNumber, message);
+      const success = await whatsappService.sendMessage(phoneNumber, message, sessionId);
       
       if (success) {
         const timestamp = Math.floor(Date.now() / 1000);
@@ -365,7 +432,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.params.phoneNumber,
           message,
           true,
-          timestamp
+          timestamp,
+          sessionId
         );
         broadcast({ type: 'message', data: { conversation } });
         broadcast({
@@ -623,7 +691,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/whatsapp/contacts', async (req, res) => {
     try {
-      const contacts = await whatsappService.getContacts();
+      const sessionId = req.query.sessionId as string | undefined;
+      const contacts = await whatsappService.getContacts(sessionId);
       res.json(contacts);
     } catch (error: any) {
       res.status(500).json({ error: error?.message || 'Failed to fetch contacts' });
@@ -632,7 +701,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/whatsapp/chats', async (req, res) => {
     try {
-      const chats = await whatsappService.getChats();
+      const sessionId = req.query.sessionId as string | undefined;
+      const chats = await whatsappService.getChats(sessionId);
       res.json(chats);
     } catch (error: any) {
       res.status(500).json({ error: error?.message || 'Failed to fetch chats' });
@@ -641,7 +711,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/whatsapp/chats/pinned', async (req, res) => {
     try {
-      const pinnedChats = await whatsappService.getPinnedChats();
+      const sessionId = req.query.sessionId as string | undefined;
+      const pinnedChats = await whatsappService.getPinnedChats(sessionId);
       res.json(pinnedChats);
     } catch (error: any) {
       res.status(500).json({ error: error?.message || 'Failed to fetch pinned chats' });
@@ -651,7 +722,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/whatsapp/chats/recent', async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 20;
-      const recentChats = await whatsappService.getRecentChats(limit);
+      const sessionId = req.query.sessionId as string | undefined;
+      const recentChats = await whatsappService.getRecentChats(limit, sessionId);
       res.json(recentChats);
     } catch (error: any) {
       res.status(500).json({ error: error?.message || 'Failed to fetch recent chats' });
@@ -660,7 +732,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/whatsapp/session', async (req, res) => {
     try {
-      const sessionDetails = await whatsappService.getSessionDetails();
+      const sessionId = req.query.sessionId as string | undefined;
+      const sessionDetails = await whatsappService.getSessionDetails(sessionId);
       res.json(sessionDetails);
     } catch (error: any) {
       res.status(500).json({ error: error?.message || 'Failed to fetch session details' });
@@ -669,9 +742,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/whatsapp/session/suspend', async (req, res) => {
     try {
-      const result = await whatsappService.suspendSession();
+      const sessionId = req.body?.sessionId;
+      const result = await whatsappService.suspendSession(sessionId);
       if (result.success) {
-        broadcast({ type: 'session_status', data: { suspended: true } });
+        broadcast({ type: 'session_status', data: { suspended: true, sessionId } });
       }
       res.json(result);
     } catch (error: any) {
@@ -681,9 +755,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/whatsapp/session/resume', async (req, res) => {
     try {
-      const result = await whatsappService.resumeSession();
+      const sessionId = req.body?.sessionId;
+      const result = await whatsappService.resumeSession(sessionId);
       if (result.success) {
-        broadcast({ type: 'session_status', data: { suspended: false } });
+        broadcast({ type: 'session_status', data: { suspended: false, sessionId } });
       }
       res.json(result);
     } catch (error: any) {
@@ -693,7 +768,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/whatsapp/contacts-data', async (req, res) => {
     try {
-      const status = whatsappService.getStatus();
+      const sessionId = req.query.sessionId as string | undefined;
+      const status = whatsappService.getStatus(sessionId);
       if (!status.isConnected || !status.isReady) {
         return res.json({
           phoneNumber: null,
@@ -705,9 +781,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [contacts, pinnedChats, recentChats] = await Promise.all([
-        whatsappService.getContacts(),
-        whatsappService.getPinnedChats(),
-        whatsappService.getRecentChats(30),
+        whatsappService.getContacts(sessionId),
+        whatsappService.getPinnedChats(sessionId),
+        whatsappService.getRecentChats(30, sessionId),
       ]);
 
       res.json({

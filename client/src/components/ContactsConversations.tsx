@@ -9,6 +9,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
   Users, 
   Search, 
   MessageSquare, 
@@ -17,9 +24,17 @@ import {
   Phone,
   User,
   RefreshCw,
-  MessageCircle
+  MessageCircle,
+  Smartphone
 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+
+interface LinkedSession {
+  id: string;
+  phoneNumber: string;
+  isConnected: boolean;
+  isReady: boolean;
+}
 
 interface WhatsAppContact {
   id: string;
@@ -56,14 +71,35 @@ interface ContactsData {
 export default function ContactsConversations() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("contacts");
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+
+  const { data: sessions = [] } = useQuery<LinkedSession[]>({
+    queryKey: ['/api/sessions'],
+    refetchInterval: 30000,
+  });
+
+  const activeSessions = sessions.filter(s => s.isConnected && s.isReady);
 
   const { data: contactsData, isLoading, refetch, isRefetching } = useQuery<ContactsData>({
-    queryKey: ['/api/whatsapp/contacts-data'],
+    queryKey: ['/api/whatsapp/contacts-data', selectedSessionId],
+    queryFn: async () => {
+      const url = selectedSessionId 
+        ? `/api/whatsapp/contacts-data?sessionId=${selectedSessionId}`
+        : '/api/whatsapp/contacts-data';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch contacts');
+      return response.json();
+    },
     refetchInterval: 60000,
+    enabled: activeSessions.length > 0 || !selectedSessionId,
   });
 
   const handleRefresh = () => {
     refetch();
+  };
+
+  const handleSessionChange = (sessionId: string) => {
+    setSelectedSessionId(sessionId === 'all' ? null : sessionId);
   };
 
   const filteredContacts = (contactsData?.contacts || []).filter(contact =>
@@ -85,7 +121,7 @@ export default function ContactsConversations() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  if (!contactsData?.phoneNumber) {
+  if (activeSessions.length === 0 && !contactsData?.phoneNumber) {
     return (
       <Card data-testid="card-no-connection">
         <CardContent className="pt-6">
@@ -109,12 +145,34 @@ export default function ContactsConversations() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                جهات الاتصال والمحادثات للمستخدم
+                جهات الاتصال والمحادثات
               </CardTitle>
-              <CardDescription className="flex items-center gap-2 mt-1">
-                <Phone className="h-4 w-4" />
-                <span dir="ltr">{contactsData.phoneNumber}</span>
-              </CardDescription>
+              {activeSessions.length > 1 ? (
+                <div className="flex items-center gap-2 mt-2">
+                  <Smartphone className="h-4 w-4 text-muted-foreground" />
+                  <Select 
+                    value={selectedSessionId || 'all'} 
+                    onValueChange={handleSessionChange}
+                  >
+                    <SelectTrigger className="w-[200px]" data-testid="select-session">
+                      <SelectValue placeholder="اختر جلسة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">كل الجلسات</SelectItem>
+                      {activeSessions.map((session) => (
+                        <SelectItem key={session.id} value={session.id}>
+                          +{session.phoneNumber}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : contactsData?.phoneNumber && (
+                <CardDescription className="flex items-center gap-2 mt-1">
+                  <Phone className="h-4 w-4" />
+                  <span dir="ltr">+{contactsData.phoneNumber}</span>
+                </CardDescription>
+              )}
             </div>
             <Button
               variant="outline"

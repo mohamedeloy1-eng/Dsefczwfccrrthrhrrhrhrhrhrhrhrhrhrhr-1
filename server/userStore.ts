@@ -2,8 +2,8 @@ import { UserData, UserClassification, RateLimitData, SecuritySettings, UserStat
 import { randomUUID } from 'crypto';
 
 class UserStore {
-  private users: Map<string, UserData> = new Map();
-  private rateLimits: Map<string, RateLimitData> = new Map();
+  private sessionUsers: Map<string, Map<string, UserData>> = new Map();
+  private sessionRateLimits: Map<string, Map<string, RateLimitData>> = new Map();
   private securitySettings: SecuritySettings = {
     defaultMessageLimit: 20,
     spamThreshold: 5,
@@ -11,14 +11,35 @@ class UserStore {
     safeModeEnabled: false,
     maxMessagesPerDay: 500,
   };
+  private defaultSessionId: string = 'default';
+
+  private getSessionUsersMap(sessionId: string = this.defaultSessionId): Map<string, UserData> {
+    if (!this.sessionUsers.has(sessionId)) {
+      this.sessionUsers.set(sessionId, new Map());
+    }
+    return this.sessionUsers.get(sessionId)!;
+  }
+
+  private getSessionRateLimitsMap(sessionId: string = this.defaultSessionId): Map<string, RateLimitData> {
+    if (!this.sessionRateLimits.has(sessionId)) {
+      this.sessionRateLimits.set(sessionId, new Map());
+    }
+    return this.sessionRateLimits.get(sessionId)!;
+  }
 
   private formatPhoneNumber(phone: string): string {
     return phone.replace('@c.us', '').replace(/\D/g, '');
   }
 
-  getOrCreateUser(phoneNumber: string): UserData {
+  setDefaultSessionId(sessionId: string): void {
+    this.defaultSessionId = sessionId;
+  }
+
+  getOrCreateUser(phoneNumber: string, sessionId?: string): UserData {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    let user = this.users.get(normalizedPhone);
+    let user = users.get(normalizedPhone);
 
     if (!user) {
       user = {
@@ -33,54 +54,72 @@ class UserStore {
         messagesToday: 0,
         lastActivity: new Date(),
         createdAt: new Date(),
-        sessionId: randomUUID(),
+        sessionId: sid,
         errorCount: 0,
         lastError: null,
       };
-      this.users.set(normalizedPhone, user);
+      users.set(normalizedPhone, user);
     }
 
     return user;
   }
 
-  getUser(phoneNumber: string): UserData | undefined {
+  getUser(phoneNumber: string, sessionId?: string): UserData | undefined {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    return this.users.get(normalizedPhone);
+    return users.get(normalizedPhone);
   }
 
-  getAllUsers(): UserData[] {
-    return Array.from(this.users.values()).sort((a, b) => 
+  getAllUsers(sessionId?: string): UserData[] {
+    if (sessionId) {
+      const users = this.getSessionUsersMap(sessionId);
+      return Array.from(users.values()).sort((a, b) => 
+        b.lastActivity.getTime() - a.lastActivity.getTime()
+      );
+    }
+    
+    const allUsers: UserData[] = [];
+    this.sessionUsers.forEach((users) => {
+      allUsers.push(...users.values());
+    });
+    return allUsers.sort((a, b) => 
       b.lastActivity.getTime() - a.lastActivity.getTime()
     );
   }
 
-  searchUsers(query: string): UserData[] {
+  searchUsers(query: string, sessionId?: string): UserData[] {
     const searchTerm = query.toLowerCase();
-    return this.getAllUsers().filter(user => 
+    return this.getAllUsers(sessionId).filter(user => 
       user.phoneNumber.includes(searchTerm) ||
       user.name.toLowerCase().includes(searchTerm)
     );
   }
 
-  updateUser(phoneNumber: string, updates: Partial<UserData>): UserData | undefined {
+  updateUser(phoneNumber: string, updates: Partial<UserData>, sessionId?: string): UserData | undefined {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.users.get(normalizedPhone);
+    const user = users.get(normalizedPhone);
     if (user) {
       Object.assign(user, updates);
-      this.users.set(normalizedPhone, user);
+      users.set(normalizedPhone, user);
     }
     return user;
   }
 
-  blockUser(phoneNumber: string, reason?: string): boolean {
+  blockUser(phoneNumber: string, reason?: string, sessionId?: string): boolean {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
+    const rateLimits = this.getSessionRateLimitsMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.users.get(normalizedPhone);
+    const user = users.get(normalizedPhone);
     if (user) {
       user.isBlocked = true;
       user.lastError = reason || 'Blocked by admin';
-      this.users.set(normalizedPhone, user);
+      users.set(normalizedPhone, user);
 
-      const rateLimit = this.rateLimits.get(normalizedPhone) || {
+      const rateLimit = rateLimits.get(normalizedPhone) || {
         phoneNumber: normalizedPhone,
         messageCount: 0,
         windowStart: new Date(),
@@ -88,28 +127,31 @@ class UserStore {
       };
       rateLimit.blocked = true;
       rateLimit.blockReason = reason || 'Blocked by admin';
-      this.rateLimits.set(normalizedPhone, rateLimit);
+      rateLimits.set(normalizedPhone, rateLimit);
 
       return true;
     }
     return false;
   }
 
-  unblockUser(phoneNumber: string): boolean {
+  unblockUser(phoneNumber: string, sessionId?: string): boolean {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
+    const rateLimits = this.getSessionRateLimitsMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.users.get(normalizedPhone);
+    const user = users.get(normalizedPhone);
     if (user) {
       user.isBlocked = false;
       user.errorCount = 0;
       user.lastError = null;
-      this.users.set(normalizedPhone, user);
+      users.set(normalizedPhone, user);
 
-      const rateLimit = this.rateLimits.get(normalizedPhone);
+      const rateLimit = rateLimits.get(normalizedPhone);
       if (rateLimit) {
         rateLimit.blocked = false;
         rateLimit.blockReason = undefined;
         rateLimit.blockExpiry = undefined;
-        this.rateLimits.set(normalizedPhone, rateLimit);
+        rateLimits.set(normalizedPhone, rateLimit);
       }
 
       return true;
@@ -117,57 +159,66 @@ class UserStore {
     return false;
   }
 
-  setUserClassification(phoneNumber: string, classification: UserClassification): boolean {
+  setUserClassification(phoneNumber: string, classification: UserClassification, sessionId?: string): boolean {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.users.get(normalizedPhone);
+    const user = users.get(normalizedPhone);
     if (user) {
       user.classification = classification;
       if (classification === 'spam') {
         user.isBlocked = true;
       }
-      this.users.set(normalizedPhone, user);
+      users.set(normalizedPhone, user);
       return true;
     }
     return false;
   }
 
-  setUserMessageLimit(phoneNumber: string, limit: number): boolean {
+  setUserMessageLimit(phoneNumber: string, limit: number, sessionId?: string): boolean {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.users.get(normalizedPhone);
+    const user = users.get(normalizedPhone);
     if (user) {
       user.messageLimit = limit;
-      this.users.set(normalizedPhone, user);
+      users.set(normalizedPhone, user);
       return true;
     }
     return false;
   }
 
-  deleteUserSession(phoneNumber: string): boolean {
+  deleteUserSession(phoneNumber: string, sessionId?: string): boolean {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
+    const rateLimits = this.getSessionRateLimitsMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.users.get(normalizedPhone);
+    const user = users.get(normalizedPhone);
     if (user) {
       user.sessionId = null;
       user.messagesToday = 0;
-      this.users.set(normalizedPhone, user);
-      this.rateLimits.delete(normalizedPhone);
+      users.set(normalizedPhone, user);
+      rateLimits.delete(normalizedPhone);
       return true;
     }
     return false;
   }
 
-  checkRateLimit(phoneNumber: string): { allowed: boolean; reason?: string } {
+  checkRateLimit(phoneNumber: string, sessionId?: string): { allowed: boolean; reason?: string } {
     if (this.securitySettings.safeModeEnabled) {
       return { allowed: false, reason: 'Safe mode is enabled' };
     }
 
+    const sid = sessionId || this.defaultSessionId;
+    const rateLimits = this.getSessionRateLimitsMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.getOrCreateUser(normalizedPhone);
+    const user = this.getOrCreateUser(normalizedPhone, sid);
 
     if (user.isBlocked) {
       return { allowed: false, reason: 'User is blocked' };
     }
 
-    let rateLimit = this.rateLimits.get(normalizedPhone);
+    let rateLimit = rateLimits.get(normalizedPhone);
     const now = new Date();
 
     if (!rateLimit) {
@@ -177,7 +228,7 @@ class UserStore {
         windowStart: now,
         blocked: false,
       };
-      this.rateLimits.set(normalizedPhone, rateLimit);
+      rateLimits.set(normalizedPhone, rateLimit);
       return { allowed: true };
     }
 
@@ -187,7 +238,7 @@ class UserStore {
     if (timeSinceStart > windowMs) {
       rateLimit.messageCount = 1;
       rateLimit.windowStart = now;
-      this.rateLimits.set(normalizedPhone, rateLimit);
+      rateLimits.set(normalizedPhone, rateLimit);
       return { allowed: true };
     }
 
@@ -204,7 +255,7 @@ class UserStore {
     const messageLimit = user.messageLimit || this.securitySettings.defaultMessageLimit;
     
     rateLimit.messageCount++;
-    this.rateLimits.set(normalizedPhone, rateLimit);
+    rateLimits.set(normalizedPhone, rateLimit);
     
     if (rateLimit.messageCount > messageLimit) {
       return { allowed: false, reason: `Rate limit exceeded (${messageLimit}/min)` };
@@ -217,9 +268,11 @@ class UserStore {
     return { allowed: true };
   }
 
-  recordMessage(phoneNumber: string, isOutgoing: boolean): void {
+  recordMessage(phoneNumber: string, isOutgoing: boolean, sessionId?: string): void {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.getOrCreateUser(normalizedPhone);
+    const user = this.getOrCreateUser(normalizedPhone, sid);
     
     if (isOutgoing) {
       user.totalMessagesSent++;
@@ -229,26 +282,28 @@ class UserStore {
     user.messagesToday++;
     user.lastActivity = new Date();
     
-    this.users.set(normalizedPhone, user);
+    users.set(normalizedPhone, user);
   }
 
-  recordError(phoneNumber: string, errorMessage: string): { shouldBlock: boolean; blocked: boolean } {
+  recordError(phoneNumber: string, errorMessage: string, sessionId?: string): { shouldBlock: boolean; blocked: boolean } {
+    const sid = sessionId || this.defaultSessionId;
+    const users = this.getSessionUsersMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const user = this.getOrCreateUser(normalizedPhone);
+    const user = this.getOrCreateUser(normalizedPhone, sid);
     
     user.errorCount++;
     user.lastError = errorMessage;
     user.lastActivity = new Date();
     
-    this.users.set(normalizedPhone, user);
+    users.set(normalizedPhone, user);
 
     const threshold = this.securitySettings.spamThreshold;
     const shouldAutoBlock = this.securitySettings.autoBlockEnabled && user.errorCount >= threshold;
 
     if (shouldAutoBlock && !user.isBlocked) {
-      const blocked = this.blockUser(normalizedPhone, `Auto-blocked: ${user.errorCount} errors (threshold: ${threshold})`);
+      const blocked = this.blockUser(normalizedPhone, `Auto-blocked: ${user.errorCount} errors (threshold: ${threshold})`, sid);
       if (blocked) {
-        this.setUserClassification(normalizedPhone, 'spam');
+        this.setUserClassification(normalizedPhone, 'spam', sid);
       }
       return { shouldBlock: true, blocked };
     }
@@ -277,8 +332,8 @@ class UserStore {
     return this.securitySettings.safeModeEnabled;
   }
 
-  getStats(): UserStats {
-    const users = this.getAllUsers();
+  getStats(sessionId?: string): UserStats {
+    const users = this.getAllUsers(sessionId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -291,20 +346,48 @@ class UserStore {
     };
   }
 
-  resetDailyCounters(): void {
-    this.users.forEach((user, phone) => {
-      user.messagesToday = 0;
-      this.users.set(phone, user);
-    });
+  resetDailyCounters(sessionId?: string): void {
+    if (sessionId) {
+      const users = this.getSessionUsersMap(sessionId);
+      users.forEach((user, phone) => {
+        user.messagesToday = 0;
+        users.set(phone, user);
+      });
+    } else {
+      this.sessionUsers.forEach((users) => {
+        users.forEach((user, phone) => {
+          user.messagesToday = 0;
+          users.set(phone, user);
+        });
+      });
+    }
   }
 
-  clearAllUserSessions(): void {
-    this.users.forEach((user, phone) => {
-      user.sessionId = null;
-      user.messagesToday = 0;
-      this.users.set(phone, user);
-    });
-    this.rateLimits.clear();
+  clearSession(sessionId: string): void {
+    this.sessionUsers.delete(sessionId);
+    this.sessionRateLimits.delete(sessionId);
+  }
+
+  clearAllUserSessions(sessionId?: string): void {
+    if (sessionId) {
+      const users = this.getSessionUsersMap(sessionId);
+      const rateLimits = this.getSessionRateLimitsMap(sessionId);
+      users.forEach((user, phone) => {
+        user.sessionId = null;
+        user.messagesToday = 0;
+        users.set(phone, user);
+      });
+      rateLimits.clear();
+    } else {
+      this.sessionUsers.forEach((users) => {
+        users.forEach((user, phone) => {
+          user.sessionId = null;
+          user.messagesToday = 0;
+          users.set(phone, user);
+        });
+      });
+      this.sessionRateLimits.clear();
+    }
   }
 }
 

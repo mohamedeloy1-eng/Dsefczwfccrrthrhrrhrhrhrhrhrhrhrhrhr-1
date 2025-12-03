@@ -2,8 +2,16 @@ import { ConversationData, MessageData } from './types';
 import { randomUUID } from 'crypto';
 
 class ConversationStore {
-  private conversations: Map<string, ConversationData> = new Map();
-  private totalMessagesCount: number = 0;
+  private sessionConversations: Map<string, Map<string, ConversationData>> = new Map();
+  private sessionMessageCounts: Map<string, number> = new Map();
+  private defaultSessionId: string = 'default';
+
+  private getSessionMap(sessionId: string = this.defaultSessionId): Map<string, ConversationData> {
+    if (!this.sessionConversations.has(sessionId)) {
+      this.sessionConversations.set(sessionId, new Map());
+    }
+    return this.sessionConversations.get(sessionId)!;
+  }
 
   private formatPhoneNumber(phone: string): string {
     return phone.replace('@c.us', '').replace(/\D/g, '');
@@ -34,14 +42,21 @@ class ConversationStore {
     });
   }
 
+  setDefaultSessionId(sessionId: string): void {
+    this.defaultSessionId = sessionId;
+  }
+
   addMessage(
     phoneNumber: string, 
     content: string, 
     isBot: boolean, 
-    timestamp: number
+    timestamp: number,
+    sessionId?: string
   ): ConversationData {
+    const sid = sessionId || this.defaultSessionId;
+    const conversations = this.getSessionMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    let conversation = this.conversations.get(normalizedPhone);
+    let conversation = conversations.get(normalizedPhone);
 
     const message: MessageData = {
       id: randomUUID(),
@@ -60,7 +75,7 @@ class ConversationStore {
         unreadCount: isBot ? 0 : 1,
         messages: [message],
       };
-      this.conversations.set(normalizedPhone, conversation);
+      conversations.set(normalizedPhone, conversation);
     } else {
       conversation.messages.push(message);
       conversation.lastMessage = content;
@@ -70,17 +85,23 @@ class ConversationStore {
       }
     }
 
-    this.totalMessagesCount++;
+    const currentCount = this.sessionMessageCounts.get(sid) || 0;
+    this.sessionMessageCounts.set(sid, currentCount + 1);
+    
     return conversation;
   }
 
-  getConversation(phoneNumber: string): ConversationData | undefined {
+  getConversation(phoneNumber: string, sessionId?: string): ConversationData | undefined {
+    const sid = sessionId || this.defaultSessionId;
+    const conversations = this.getSessionMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    return this.conversations.get(normalizedPhone);
+    return conversations.get(normalizedPhone);
   }
 
-  getAllConversations(): ConversationData[] {
-    return Array.from(this.conversations.values())
+  getAllConversations(sessionId?: string): ConversationData[] {
+    const sid = sessionId || this.defaultSessionId;
+    const conversations = this.getSessionMap(sid);
+    return Array.from(conversations.values())
       .sort((a, b) => {
         const timeA = a.messages[a.messages.length - 1];
         const timeB = b.messages[b.messages.length - 1];
@@ -88,25 +109,58 @@ class ConversationStore {
       });
   }
 
-  markAsRead(phoneNumber: string): void {
+  getAllSessionsConversations(): ConversationData[] {
+    const allConversations: ConversationData[] = [];
+    this.sessionConversations.forEach((conversations) => {
+      allConversations.push(...conversations.values());
+    });
+    return allConversations.sort((a, b) => {
+      const timeA = a.messages[a.messages.length - 1];
+      const timeB = b.messages[b.messages.length - 1];
+      return (timeB ? 1 : 0) - (timeA ? 1 : 0);
+    });
+  }
+
+  markAsRead(phoneNumber: string, sessionId?: string): void {
+    const sid = sessionId || this.defaultSessionId;
+    const conversations = this.getSessionMap(sid);
     const normalizedPhone = this.formatPhoneNumber(phoneNumber);
-    const conversation = this.conversations.get(normalizedPhone);
+    const conversation = conversations.get(normalizedPhone);
     if (conversation) {
       conversation.unreadCount = 0;
     }
   }
 
-  getTotalMessagesCount(): number {
-    return this.totalMessagesCount;
+  getTotalMessagesCount(sessionId?: string): number {
+    if (sessionId) {
+      return this.sessionMessageCounts.get(sessionId) || 0;
+    }
+    let total = 0;
+    this.sessionMessageCounts.forEach((count) => {
+      total += count;
+    });
+    return total;
   }
 
-  getUsersCount(): number {
-    return this.conversations.size;
+  getUsersCount(sessionId?: string): number {
+    if (sessionId) {
+      return this.getSessionMap(sessionId).size;
+    }
+    let total = 0;
+    this.sessionConversations.forEach((conversations) => {
+      total += conversations.size;
+    });
+    return total;
+  }
+
+  clearSession(sessionId: string): void {
+    this.sessionConversations.delete(sessionId);
+    this.sessionMessageCounts.delete(sessionId);
   }
 
   clearAll(): void {
-    this.conversations.clear();
-    this.totalMessagesCount = 0;
+    this.sessionConversations.clear();
+    this.sessionMessageCounts.clear();
   }
 }
 

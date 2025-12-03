@@ -11,8 +11,9 @@ import UserManagement from "@/components/UserManagement";
 import SecurityPanel from "@/components/SecurityPanel";
 import ContactsConversations from "@/components/ContactsConversations";
 import SessionMonitor from "@/components/SessionMonitor";
+import LinkedSessions from "@/components/LinkedSessions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Settings, QrCode, Users, Shield, Contact, Activity } from "lucide-react";
+import { MessageSquare, Settings, QrCode, Users, Shield, Contact, Activity, Link2 } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 
@@ -73,28 +74,28 @@ export default function Dashboard() {
   const connectMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/connect'),
     onSuccess: () => {
-      toast({ title: 'Connecting...', description: 'Initializing WhatsApp connection' });
+      toast({ title: 'جاري الاتصال...', description: 'جاري تهيئة اتصال واتساب' });
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to connect', variant: 'destructive' });
+      toast({ title: 'خطأ', description: 'فشل في الاتصال', variant: 'destructive' });
     },
   });
 
   const disconnectMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/disconnect'),
     onSuccess: () => {
-      toast({ title: 'Disconnected', description: 'WhatsApp disconnected successfully' });
+      toast({ title: 'تم قطع الاتصال', description: 'تم قطع اتصال واتساب بنجاح' });
       queryClient.invalidateQueries({ queryKey: ['/api/status'] });
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to disconnect', variant: 'destructive' });
+      toast({ title: 'خطأ', description: 'فشل في قطع الاتصال', variant: 'destructive' });
     },
   });
 
   const refreshQRMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/refresh-qr'),
     onSuccess: () => {
-      toast({ title: 'Refreshing...', description: 'Generating new QR code' });
+      toast({ title: 'جاري التحديث...', description: 'جاري إنشاء رمز QR جديد' });
     },
   });
 
@@ -102,25 +103,25 @@ export default function Dashboard() {
     mutationFn: () => apiRequest('POST', '/api/repair', {}),
     onSuccess: (data: any) => {
       if (data.success) {
-        toast({ title: 'Repair Complete', description: data.message });
+        toast({ title: 'تم الإصلاح', description: data.message });
       } else {
-        toast({ title: 'Repair Issue', description: data.message, variant: 'destructive' });
+        toast({ title: 'مشكلة في الإصلاح', description: data.message, variant: 'destructive' });
       }
       queryClient.invalidateQueries({ queryKey: ['/api/status'] });
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to repair connection', variant: 'destructive' });
+      toast({ title: 'خطأ', description: 'فشل في إصلاح الاتصال', variant: 'destructive' });
     },
   });
 
   const settingsMutation = useMutation({
     mutationFn: (data: BotSettings) => apiRequest('POST', '/api/settings', data),
     onSuccess: () => {
-      toast({ title: 'Settings Saved', description: 'Bot settings updated successfully' });
+      toast({ title: 'تم الحفظ', description: 'تم تحديث إعدادات البوت بنجاح' });
       queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' });
+      toast({ title: 'خطأ', description: 'فشل في حفظ الإعدادات', variant: 'destructive' });
     },
   });
 
@@ -185,6 +186,16 @@ export default function Dashboard() {
     const unsubSessionStatus = subscribe('session_status', () => {
       queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/session'] });
       queryClient.invalidateQueries({ queryKey: ['/api/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    });
+
+    const unsubSessions = subscribe('sessions', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    });
+
+    const unsubSessionTerminated = subscribe('sessionTerminated', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/status'] });
     });
 
     return () => {
@@ -199,6 +210,8 @@ export default function Dashboard() {
       unsubSafeMode();
       unsubSecuritySettings();
       unsubSessionStatus();
+      unsubSessions();
+      unsubSessionTerminated();
     };
   }, [subscribe, toast]);
 
@@ -232,11 +245,11 @@ export default function Dashboard() {
       const result = await response.json() as { success: boolean; code?: string; error?: string };
       if (result.success && result.code) {
         setPairingCode(result.code);
-        toast({ title: 'Code Received', description: 'Enter the code in WhatsApp to link your device' });
+        toast({ title: 'تم استلام الكود', description: 'أدخل الكود في واتساب لربط جهازك' });
       }
       return result;
     } catch (error: any) {
-      return { success: false, error: error?.message || 'Failed to request pairing code' };
+      return { success: false, error: error?.message || 'فشل في طلب كود الربط' };
     }
   };
 
@@ -260,7 +273,7 @@ export default function Dashboard() {
         />
 
         <Tabs defaultValue="conversations" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 max-w-4xl">
+          <TabsList className="grid w-full grid-cols-8 max-w-5xl">
             <TabsTrigger value="conversations" className="gap-2" data-testid="tab-conversations">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">المحادثات</span>
@@ -269,9 +282,13 @@ export default function Dashboard() {
               <Contact className="h-4 w-4" />
               <span className="hidden sm:inline">جهات الاتصال</span>
             </TabsTrigger>
+            <TabsTrigger value="sessions" className="gap-2" data-testid="tab-linked-sessions">
+              <Link2 className="h-4 w-4" />
+              <span className="hidden sm:inline">الجلسات</span>
+            </TabsTrigger>
             <TabsTrigger value="session" className="gap-2" data-testid="tab-session">
               <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">الجلسة</span>
+              <span className="hidden sm:inline">المراقبة</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2" data-testid="tab-users">
               <Users className="h-4 w-4" />
@@ -315,6 +332,10 @@ export default function Dashboard() {
 
           <TabsContent value="contacts" className="mt-6">
             <ContactsConversations />
+          </TabsContent>
+
+          <TabsContent value="sessions" className="mt-6">
+            <LinkedSessions />
           </TabsContent>
 
           <TabsContent value="session" className="mt-6">
