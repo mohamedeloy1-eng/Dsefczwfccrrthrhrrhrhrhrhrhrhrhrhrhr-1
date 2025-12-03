@@ -1,2 +1,3 @@
-2025/12/03-06:14:01.072 637 Creating DB /home/runner/workspace/.wwebjs_auth/session-pairing_1764742440914/Default/shared_proto_db/metadata since it was missing.
-2025/12/03-06:14:01.081 637 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-pairing_1764742440914/Default/shared_proto_db/metadata/MANIFEST-000001
+2025/12/03-22:58:03.292 19b4 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-pairing_1764742440914/Default/shared_proto_db/metadata/MANIFEST-000001
+2025/12/03-22:58:03.295 19b4 Recovering log #3
+2025/12/03-22:58:03.295 19b4 Reusing old log /home/runner/workspace/.wwebjs_auth/session-pairing_1764742440914/Default/shared_proto_db/metadata/000003.log 

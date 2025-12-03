@@ -761,6 +761,38 @@ class WhatsAppService extends EventEmitter {
     super();
   }
 
+  async restoreStoredSessions(): Promise<void> {
+    const authPath = './.wwebjs_auth';
+    if (!fs.existsSync(authPath)) {
+      console.log('No stored sessions found');
+      return;
+    }
+
+    try {
+      const entries = fs.readdirSync(authPath, { withFileTypes: true });
+      const sessionDirs = entries
+        .filter(entry => entry.isDirectory() && entry.name.startsWith('session-'))
+        .map(entry => entry.name.replace('session-', ''));
+
+      console.log(`Found ${sessionDirs.length} stored sessions:`, sessionDirs);
+
+      for (const sessionId of sessionDirs) {
+        if (sessionId === 'default' || sessionId.startsWith('session_') || sessionId.startsWith('pairing_')) {
+          try {
+            console.log(`Restoring session: ${sessionId}`);
+            const session = this.getOrCreateSession(sessionId);
+            await session.initialize();
+            console.log(`Session ${sessionId} restored successfully`);
+          } catch (err) {
+            console.error(`Failed to restore session ${sessionId}:`, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error restoring sessions:', err);
+    }
+  }
+
   private getOrCreateSession(sessionId: string = 'default'): WhatsAppSession {
     if (!this.sessions.has(sessionId)) {
       const session = new WhatsAppSession(sessionId);

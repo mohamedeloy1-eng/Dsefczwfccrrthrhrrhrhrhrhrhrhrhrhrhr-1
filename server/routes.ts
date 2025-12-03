@@ -28,6 +28,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         safeModeEnabled: userStore.isSafeModeEnabled(),
       }
     }));
+    
+    ws.send(JSON.stringify({ type: 'sessions', data: whatsappService.getLinkedSessions() }));
 
     ws.on('close', () => {
       console.log('WebSocket client disconnected');
@@ -43,6 +45,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   };
+
+  console.log('Starting to restore stored WhatsApp sessions...');
+  whatsappService.restoreStoredSessions().then(() => {
+    console.log('Session restoration complete');
+    broadcast({ type: 'sessions', data: whatsappService.getLinkedSessions() });
+  }).catch(err => {
+    console.error('Error during session restoration:', err);
+  });
 
   whatsappService.on('status', (statusData) => {
     const status = whatsappService.getStatus();
@@ -769,7 +779,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/whatsapp/contacts-data', async (req, res) => {
     try {
-      const sessionId = req.query.sessionId as string | undefined;
+      let sessionId = req.query.sessionId as string | undefined;
+      
+      if (!sessionId) {
+        const linkedSessions = whatsappService.getLinkedSessions();
+        const readySession = linkedSessions.find(s => s.isConnected && s.isReady);
+        if (readySession) {
+          sessionId = readySession.id;
+        }
+      }
+      
       const status = whatsappService.getStatus(sessionId);
       if (!status.isConnected || !status.isReady) {
         return res.json({

@@ -173,6 +173,8 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     transition: background-image 0.3s ease-in-out;
+    position: relative;
+    min-height: 100vh;
   }
 
   body.has-background-image {
@@ -183,13 +185,15 @@
     background-repeat: no-repeat;
   }
 
-  body.has-background-image::before {
+  body.has-background-image > #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  body.has-background-image > #root::before {
     content: "";
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: hsl(var(--background) / 0.85);
     z-index: -1;
     pointer-events: none;
