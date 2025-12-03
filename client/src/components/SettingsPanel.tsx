@@ -76,75 +76,76 @@ export default function SettingsPanel({ botName: initialName, systemPrompt: init
   };
 
   return (
-    <Card data-testid="card-settings">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
-          Bot Settings
-        </CardTitle>
-        <CardDescription>Configure your GX-MODY bot behavior</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="botName" className="flex items-center gap-2">
-            <Key className="h-4 w-4" />
-            Bot Name
-          </Label>
-          <Input
-            id="botName"
-            value={botName}
-            onChange={(e) => setBotName(e.target.value)}
-            placeholder="GX-MODY"
-            data-testid="input-bot-name"
-          />
-        </div>
+    <>
+      <Card data-testid="card-settings">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Bot Settings
+          </CardTitle>
+          <CardDescription>Configure your GX-MODY bot behavior</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="botName" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              Bot Name
+            </Label>
+            <Input
+              id="botName"
+              value={botName}
+              onChange={(e) => setBotName(e.target.value)}
+              placeholder="GX-MODY"
+              data-testid="input-bot-name"
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="systemPrompt" className="flex items-center gap-2">
-            <MessageSquareText className="h-4 w-4" />
-            System Prompt
-          </Label>
-          <Textarea
-            id="systemPrompt"
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            placeholder="You are a helpful AI assistant..."
-            className="min-h-[120px] resize-none"
-            data-testid="input-system-prompt"
-          />
-          <p className="text-xs text-muted-foreground">
-            This prompt defines how your bot will behave and respond to users
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between rounded-md border p-4">
-          <div className="space-y-0.5">
-            <Label htmlFor="autoReply">الرد التلقائي</Label>
+          <div className="space-y-2">
+            <Label htmlFor="systemPrompt" className="flex items-center gap-2">
+              <MessageSquareText className="h-4 w-4" />
+              System Prompt
+            </Label>
+            <Textarea
+              id="systemPrompt"
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="You are a helpful AI assistant..."
+              className="min-h-[120px] resize-none"
+              data-testid="input-system-prompt"
+            />
             <p className="text-xs text-muted-foreground">
-              الرد تلقائياً على جميع الرسائل الواردة
+              This prompt defines how your bot will behave and respond to users
             </p>
           </div>
-          <Switch
-            id="autoReply"
-            checked={autoReply}
-            onCheckedChange={setAutoReply}
-            data-testid="switch-auto-reply"
-          />
-        </div>
 
-        <Button 
-          onClick={handleSave} 
-          className="w-full" 
-          disabled={isSaving}
-          data-testid="button-save-settings"
-        >
-          <Save className="h-4 w-4 ml-2" />
-          {isSaving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
-        </Button>
-      </CardContent>
-    </Card>
+          <div className="flex items-center justify-between rounded-md border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="autoReply">الرد التلقائي</Label>
+              <p className="text-xs text-muted-foreground">
+                الرد تلقائياً على جميع الرسائل الواردة
+              </p>
+            </div>
+            <Switch
+              id="autoReply"
+              checked={autoReply}
+              onCheckedChange={setAutoReply}
+              data-testid="switch-auto-reply"
+            />
+          </div>
 
-    <Card data-testid="card-background-settings" className="mt-6">
+          <Button 
+            onClick={handleSave} 
+            className="w-full" 
+            disabled={isSaving}
+            data-testid="button-save-settings"
+          >
+            <Save className="h-4 w-4 ml-2" />
+            {isSaving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-background-settings" className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Image className="h-5 w-5" />
@@ -210,5 +211,6 @@ export default function SettingsPanel({ botName: initialName, systemPrompt: init
         )}
       </CardContent>
     </Card>
+    </>
   );
 }
