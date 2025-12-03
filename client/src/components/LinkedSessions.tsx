@@ -3,9 +3,12 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,9 +31,14 @@ import {
   RefreshCw,
   Pause,
   Play,
-  Phone
+  Phone,
+  QrCode,
+  Loader2,
+  X,
+  Copy,
+  Check
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface LinkedSession {
   id: string;
@@ -44,24 +52,124 @@ interface LinkedSession {
 
 export default function LinkedSessions() {
   const { toast } = useToast();
+  const { subscribe } = useWebSocket();
   const [terminatingSession, setTerminatingSession] = useState<string | null>(null);
+  const [showLinkingPanel, setShowLinkingPanel] = useState(false);
+  const [newSessionId, setNewSessionId] = useState<string | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isRequestingCode, setIsRequestingCode] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [pairingError, setPairingError] = useState<string | null>(null);
 
   const { data: sessions = [], isLoading, refetch, isRefetching } = useQuery<LinkedSession[]>({
     queryKey: ['/api/sessions'],
     refetchInterval: 10000,
   });
 
+  useEffect(() => {
+    const unsubQR = subscribe('qr', (data: string) => {
+      if (showLinkingPanel) {
+        setQrCode(data);
+      }
+    });
+
+    const unsubPairingCode = subscribe('pairingCode', (data: string) => {
+      if (showLinkingPanel) {
+        setPairingCode(data);
+      }
+    });
+
+    const unsubStatus = subscribe('status', (data: any) => {
+      if (showLinkingPanel && data.isReady && data.sessionId === newSessionId) {
+        toast({ title: 'تم الربط بنجاح', description: 'تم ربط رقم واتساب جديد' });
+        setShowLinkingPanel(false);
+        setQrCode(null);
+        setPairingCode(null);
+        setNewSessionId(null);
+        setPhoneNumber("");
+        queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      }
+    });
+
+    return () => {
+      unsubQR();
+      unsubPairingCode();
+      unsubStatus();
+    };
+  }, [subscribe, showLinkingPanel, newSessionId, toast]);
+
   const createSessionMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/sessions/create'),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/sessions/create');
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.sessionId) {
+        setNewSessionId(data.sessionId);
+        setShowLinkingPanel(true);
+        setQrCode(null);
+        setPairingCode(null);
+        setPhoneNumber("");
+        setPairingError(null);
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/status'] });
-      toast({ title: 'تم إنشاء جلسة جديدة', description: 'يمكنك الآن ربط رقم واتساب جديد' });
+      toast({ title: 'تم إنشاء جلسة جديدة', description: 'امسح رمز QR أو استخدم رقم الهاتف للربط' });
     },
     onError: () => {
       toast({ title: 'خطأ', description: 'فشل في إنشاء جلسة جديدة', variant: 'destructive' });
     },
   });
+
+  const handleRequestPairingCode = async () => {
+    if (!phoneNumber.trim() || !newSessionId) {
+      setPairingError("يرجى إدخال رقم الهاتف");
+      return;
+    }
+
+    setIsRequestingCode(true);
+    setPairingError(null);
+
+    try {
+      const response = await apiRequest('POST', '/api/request-pairing-code', { 
+        phoneNumber: phoneNumber.trim(),
+        sessionId: newSessionId
+      });
+      const result = await response.json() as { success: boolean; code?: string; error?: string };
+      if (result.success && result.code) {
+        setPairingCode(result.code);
+        toast({ title: 'تم استلام الكود', description: 'أدخل الكود في واتساب لربط جهازك' });
+      } else {
+        setPairingError(result.error || "فشل في الحصول على كود الربط");
+      }
+    } catch (error: any) {
+      setPairingError(error?.message || "فشل في طلب كود الربط");
+    } finally {
+      setIsRequestingCode(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (pairingCode) {
+      navigator.clipboard.writeText(pairingCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCancelLinking = () => {
+    if (newSessionId) {
+      terminateSessionMutation.mutate(newSessionId);
+    }
+    setShowLinkingPanel(false);
+    setQrCode(null);
+    setPairingCode(null);
+    setNewSessionId(null);
+    setPhoneNumber("");
+    setPairingError(null);
+  };
 
   const terminateSessionMutation = useMutation({
     mutationFn: (sessionId: string) => apiRequest('POST', `/api/sessions/${sessionId}/terminate`),
@@ -181,6 +289,169 @@ export default function LinkedSessions() {
           </div>
         </CardHeader>
       </Card>
+
+      {showLinkingPanel && (
+        <Card data-testid="card-linking-panel">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5" />
+                  ربط رقم واتساب جديد
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  امسح رمز QR أو استخدم رقم الهاتف للربط
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCancelLinking}
+                data-testid="button-cancel-linking"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="qr" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="qr" className="gap-2" data-testid="tab-qr-code">
+                  <QrCode className="h-4 w-4" />
+                  رمز QR
+                </TabsTrigger>
+                <TabsTrigger value="phone" className="gap-2" data-testid="tab-phone-link">
+                  <Phone className="h-4 w-4" />
+                  رقم الهاتف
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="qr" className="mt-0">
+                <div className="flex flex-col items-center justify-center py-4">
+                  {qrCode ? (
+                    <div className="p-4 bg-white rounded-lg" data-testid="qr-code-image">
+                      <img 
+                        src={qrCode} 
+                        alt="WhatsApp QR Code" 
+                        className="w-48 h-48 object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center" data-testid="qr-code-placeholder">
+                      <div className="text-center">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground px-4">
+                          جاري تحميل رمز QR...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-4 text-center space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      1. افتح واتساب على هاتفك
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      2. اذهب إلى الإعدادات ← الأجهزة المرتبطة
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      3. امسح رمز QR بهاتفك
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="phone" className="mt-0">
+                <div className="flex flex-col items-center justify-center py-4 space-y-4">
+                  <div className="w-full max-w-xs space-y-3">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">رقم الهاتف</label>
+                      <Input
+                        type="tel"
+                        placeholder="201234567890"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="text-center text-lg"
+                        dir="ltr"
+                        data-testid="input-phone-number"
+                        disabled={isRequestingCode}
+                      />
+                      <p className="text-xs text-muted-foreground text-center">
+                        أدخل الرقم مع كود الدولة (مثل: 201234567890)
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={handleRequestPairingCode}
+                      disabled={isRequestingCode || !phoneNumber.trim()}
+                      className="w-full"
+                      data-testid="button-request-code"
+                    >
+                      {isRequestingCode ? (
+                        <>
+                          <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                          جاري الطلب...
+                        </>
+                      ) : (
+                        <>
+                          <Phone className="h-4 w-4 ml-2" />
+                          الحصول على كود الربط
+                        </>
+                      )}
+                    </Button>
+
+                    {pairingError && (
+                      <p className="text-sm text-destructive text-center" data-testid="text-pairing-error">
+                        {pairingError}
+                      </p>
+                    )}
+
+                    {pairingCode && (
+                      <div className="mt-4 p-4 bg-primary/10 rounded-lg text-center space-y-2">
+                        <p className="text-sm font-medium">كود الربط:</p>
+                        <div className="flex items-center justify-center gap-2">
+                          <p className="text-3xl font-bold tracking-widest font-mono" data-testid="text-pairing-code" dir="ltr">
+                            {pairingCode}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleCopyCode}
+                            data-testid="button-copy-code"
+                          >
+                            {copied ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          أدخل هذا الكود في واتساب لربط الجهاز
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-center space-y-1 pt-2">
+                    <p className="text-sm text-muted-foreground">
+                      1. افتح واتساب على هاتفك
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      2. اذهب إلى الإعدادات ← الأجهزة المرتبطة
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      3. اضغط "ربط جهاز" ثم "الربط برقم الهاتف بدلاً من ذلك"
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      4. أدخل كود الربط المعروض أعلاه
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
 
       <Card data-testid="card-sessions-stats">
         <CardContent className="pt-6">
