@@ -56,6 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       type: 'status', 
       data: {
         ...status,
+        sessionId: statusData?.sessionId,
         messagesCount: conversationStore.getTotalMessagesCount(),
         usersCount: conversationStore.getUsersCount(),
         safeModeEnabled: userStore.isSafeModeEnabled(),
