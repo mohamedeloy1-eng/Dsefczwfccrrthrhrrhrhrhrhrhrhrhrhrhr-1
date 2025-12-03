@@ -28,11 +28,24 @@ function ThemeInitializer() {
   return null;
 }
 
+function BackgroundInitializer() {
+  useEffect(() => {
+    const savedBackground = localStorage.getItem('app-background');
+    if (savedBackground) {
+      const root = document.documentElement;
+      root.style.setProperty('--app-background-image', `url(${savedBackground})`);
+      document.body.classList.add('has-background-image');
+    }
+  }, []);
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeInitializer />
+        <BackgroundInitializer />
         <Toaster />
         <Router />
       </TooltipProvider>
