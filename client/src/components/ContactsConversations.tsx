@@ -198,7 +198,7 @@ export default function ContactsConversations() {
               <div>
                 <p className="text-sm text-muted-foreground">جهات الاتصال</p>
                 <p className="text-2xl font-bold" data-testid="text-contacts-count">
-                  {contactsData.contacts.length}
+                  {contactsData?.contacts?.length ?? 0}
                 </p>
               </div>
             </div>
@@ -214,7 +214,7 @@ export default function ContactsConversations() {
               <div>
                 <p className="text-sm text-muted-foreground">المحادثات المثبتة</p>
                 <p className="text-2xl font-bold" data-testid="text-pinned-count">
-                  {contactsData.pinnedChats.length}
+                  {contactsData?.pinnedChats?.length ?? 0}
                 </p>
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function ContactsConversations() {
               <div>
                 <p className="text-sm text-muted-foreground">المحادثات الحديثة</p>
                 <p className="text-2xl font-bold" data-testid="text-recent-count">
-                  {contactsData.recentChats.length}
+                  {contactsData?.recentChats?.length ?? 0}
                 </p>
               </div>
             </div>
