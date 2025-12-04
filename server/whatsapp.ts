@@ -776,17 +776,36 @@ class WhatsAppService extends EventEmitter {
 
       console.log(`Found ${sessionDirs.length} stored sessions:`, sessionDirs);
 
-      for (const sessionId of sessionDirs) {
-        if (sessionId === 'default' || sessionId.startsWith('session_') || sessionId.startsWith('pairing_')) {
-          try {
-            console.log(`Restoring session: ${sessionId}`);
-            const session = this.getOrCreateSession(sessionId);
-            await session.initialize();
-            console.log(`Session ${sessionId} restored successfully`);
-          } catch (err) {
-            console.error(`Failed to restore session ${sessionId}:`, err);
+      // Clean up old pairing and temporary sessions
+      const sessionsToClean = sessionDirs.filter(id => 
+        id.startsWith('pairing_') || 
+        (id.startsWith('session_') && id !== 'default')
+      );
+      
+      for (const sessionId of sessionsToClean) {
+        try {
+          const sessionPath = path.join(authPath, `session-${sessionId}`);
+          if (fs.existsSync(sessionPath)) {
+            fs.rmSync(sessionPath, { recursive: true, force: true });
+            console.log(`Cleaned up old session: ${sessionId}`);
           }
+        } catch (err) {
+          console.error(`Failed to clean up session ${sessionId}:`, err);
         }
+      }
+
+      // Only restore the default session
+      if (sessionDirs.includes('default')) {
+        try {
+          console.log('Restoring default session');
+          const session = this.getOrCreateSession('default');
+          await session.initialize();
+          console.log('Default session restored successfully');
+        } catch (err) {
+          console.error('Failed to restore default session:', err);
+        }
+      } else {
+        console.log('No default session found, starting fresh');
       }
     } catch (err) {
       console.error('Error restoring sessions:', err);
