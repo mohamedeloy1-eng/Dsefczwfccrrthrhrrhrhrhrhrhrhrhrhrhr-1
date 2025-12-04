@@ -475,6 +475,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(updated);
   });
 
+  // AI APIs
+  app.post('/api/ai/chat', async (req, res) => {
+    try {
+      const { message, userId } = req.body;
+      if (!message) {
+        return res.status(400).json({ success: false, error: 'Message is required' });
+      }
+      const id = userId || 'web_user_' + Date.now();
+      const response = await generateResponse(id, message);
+      res.json({ success: true, response, userId: id });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message || 'Failed to generate response' });
+    }
+  });
+
+  app.post('/api/ai/image', async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ success: false, error: 'Prompt is required' });
+      }
+      const result = await generateImage(prompt);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message || 'Failed to generate image' });
+    }
+  });
+
+  app.get('/api/ai/history/:userId', (req, res) => {
+    const { getConversationHistory } = require('./openai');
+    const history = getConversationHistory(req.params.userId);
+    res.json({ userId: req.params.userId, history });
+  });
+
+  app.delete('/api/ai/history/:userId', (req, res) => {
+    clearConversationHistory(req.params.userId);
+    res.json({ success: true, message: 'Conversation history cleared' });
+  });
+
   app.post('/api/conversations/:phoneNumber/clear', (req, res) => {
     clearConversationHistory(req.params.phoneNumber);
     res.json({ success: true });

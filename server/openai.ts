@@ -79,7 +79,7 @@ export async function generateImage(prompt: string): Promise<{ success: boolean;
       quality: 'standard',
     });
 
-    const imageUrl = response.data[0]?.url;
+    const imageUrl = response.data?.[0]?.url;
     if (imageUrl) {
       return { success: true, imageUrl };
     }
