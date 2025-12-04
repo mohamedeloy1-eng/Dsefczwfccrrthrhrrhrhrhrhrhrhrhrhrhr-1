@@ -79,6 +79,7 @@ export default function ContactsConversations() {
   });
 
   const activeSessions = sessions.filter(s => s.isConnected && s.isReady);
+  const hasAnySessions = sessions.length > 0;
 
   const { data: contactsData, isLoading, refetch, isRefetching } = useQuery<ContactsData>({
     queryKey: ['/api/whatsapp/contacts-data', selectedSessionId],
@@ -90,8 +91,8 @@ export default function ContactsConversations() {
       if (!response.ok) throw new Error('Failed to fetch contacts');
       return response.json();
     },
-    refetchInterval: 60000,
-    enabled: activeSessions.length > 0 || !selectedSessionId,
+    refetchInterval: 30000,
+    enabled: true,
   });
 
   const handleRefresh = () => {
@@ -121,7 +122,25 @@ export default function ContactsConversations() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  if (activeSessions.length === 0 && !contactsData?.phoneNumber) {
+  const isConnected = activeSessions.length > 0 || contactsData?.phoneNumber;
+  
+  if (isLoading) {
+    return (
+      <Card data-testid="card-loading">
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center justify-center py-12">
+            <RefreshCw className="h-12 w-12 text-muted-foreground/50 mb-4 animate-spin" />
+            <p className="text-lg font-medium text-muted-foreground">جاري التحميل...</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              جاري جلب جهات الاتصال والمحادثات
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (!isConnected) {
     return (
       <Card data-testid="card-no-connection">
         <CardContent className="pt-6">

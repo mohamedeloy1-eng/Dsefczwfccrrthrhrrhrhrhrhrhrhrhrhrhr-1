@@ -33,7 +33,7 @@ export default function SettingsPanel({ botName: initialName, systemPrompt: init
   const applyBackground = (imageUrl: string | null) => {
     const root = document.documentElement;
     if (imageUrl) {
-      root.style.setProperty('--app-background-image', `url(${imageUrl})`);
+      root.style.setProperty('--app-background-image', `url("${imageUrl}")`);
       document.body.classList.add('has-background-image');
     } else {
       root.style.removeProperty('--app-background-image');

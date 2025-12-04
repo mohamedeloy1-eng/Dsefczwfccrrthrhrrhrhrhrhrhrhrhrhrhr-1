@@ -891,7 +891,7 @@ class WhatsAppService extends EventEmitter {
   getLinkedSessions(): LinkedSession[] {
     const sessions: LinkedSession[] = [];
     this.sessions.forEach((session, id) => {
-      if (session.status.isConnected || session.status.isReady) {
+      if (session.status.isConnected || session.status.isReady || id === 'default') {
         sessions.push(session.getLinkedSessionInfo());
       }
     });

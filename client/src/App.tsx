@@ -32,9 +32,14 @@ function BackgroundInitializer() {
   useEffect(() => {
     const savedBackground = localStorage.getItem('app-background');
     if (savedBackground) {
-      const root = document.documentElement;
-      root.style.setProperty('--app-background-image', `url(${savedBackground})`);
-      document.body.classList.add('has-background-image');
+      try {
+        const root = document.documentElement;
+        root.style.setProperty('--app-background-image', `url("${savedBackground}")`);
+        document.body.classList.add('has-background-image');
+      } catch (e) {
+        console.error('Failed to apply background:', e);
+        localStorage.removeItem('app-background');
+      }
     }
   }, []);
   return null;
