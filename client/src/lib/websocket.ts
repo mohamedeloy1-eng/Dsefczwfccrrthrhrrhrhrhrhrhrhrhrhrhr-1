@@ -1,11 +1,18 @@
 type MessageHandler = (data: any) => void;
+type ConnectionHandler = (connected: boolean) => void;
 
 class WebSocketClient {
   private ws: WebSocket | null = null;
   private handlers: Map<string, Set<MessageHandler>> = new Map();
+  private connectionHandlers: Set<ConnectionHandler> = new Set();
   private reconnectInterval: number = 3000;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnecting: boolean = false;
+  private _isConnected: boolean = false;
+
+  get isConnected(): boolean {
+    return this._isConnected;
+  }
 
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) {
@@ -22,6 +29,8 @@ class WebSocketClient {
     this.ws.onopen = () => {
       console.log('WebSocket connected');
       this.isConnecting = false;
+      this._isConnected = true;
+      this.notifyConnectionHandlers(true);
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -43,12 +52,26 @@ class WebSocketClient {
     this.ws.onclose = () => {
       console.log('WebSocket disconnected');
       this.isConnecting = false;
+      this._isConnected = false;
+      this.notifyConnectionHandlers(false);
       this.scheduleReconnect();
     };
 
     this.ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       this.isConnecting = false;
+    };
+  }
+
+  private notifyConnectionHandlers(connected: boolean): void {
+    this.connectionHandlers.forEach((handler) => handler(connected));
+  }
+
+  subscribeToConnection(handler: ConnectionHandler): () => void {
+    this.connectionHandlers.add(handler);
+    handler(this._isConnected);
+    return () => {
+      this.connectionHandlers.delete(handler);
     };
   }
 

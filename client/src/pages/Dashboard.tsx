@@ -13,7 +13,10 @@ import ContactsConversations from "@/components/ContactsConversations";
 import SessionMonitor from "@/components/SessionMonitor";
 import LinkedSessions from "@/components/LinkedSessions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Settings, QrCode, Users, Shield, Contact, Activity, Link2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MessageSquare, Settings, QrCode, Users, Shield, Contact, Activity, Link2, Loader2, Wifi, WifiOff, RefreshCw, X, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 
@@ -58,14 +61,129 @@ interface BotSettings {
   autoReply: boolean;
 }
 
+function InitialLoadingScreen() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center" data-testid="loading-screen">
+      <div className="text-center space-y-4">
+        <div className="relative">
+          <div className="w-16 h-16 mx-auto">
+            <Loader2 className="w-16 h-16 animate-spin text-primary" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold">جاري التحميل...</h2>
+          <p className="text-sm text-muted-foreground">يتم تحميل لوحة تحكم GX-MODY</p>
+        </div>
+        <div className="flex justify-center gap-2 pt-4">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ConnectionAlertProps {
+  isConnected: boolean;
+  isReconnecting: boolean;
+  reconnectAttempt?: number;
+  maxReconnectAttempts?: number;
+  wsConnected: boolean;
+  onReconnect: () => void;
+  onDismiss: () => void;
+  visible: boolean;
+}
+
+function ConnectionStatusAlert({ 
+  isConnected, 
+  isReconnecting, 
+  reconnectAttempt, 
+  maxReconnectAttempts, 
+  wsConnected,
+  onReconnect, 
+  onDismiss,
+  visible 
+}: ConnectionAlertProps) {
+  if (!visible) return null;
+
+  if (isConnected && wsConnected) return null;
+
+  if (isReconnecting) {
+    return (
+      <Alert className="border-orange-500/50 bg-orange-500/10 mb-4" data-testid="alert-reconnecting">
+        <RefreshCw className="h-4 w-4 animate-spin text-orange-500" />
+        <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="flex items-center gap-2">
+            <span className="font-medium text-orange-600 dark:text-orange-400">جاري إعادة الاتصال...</span>
+            {reconnectAttempt && maxReconnectAttempts && (
+              <span className="text-sm text-muted-foreground">
+                (المحاولة {reconnectAttempt} من {maxReconnectAttempts})
+              </span>
+            )}
+          </span>
+          <Button variant="ghost" size="icon" onClick={onDismiss} data-testid="button-dismiss-alert">
+            <X className="h-4 w-4" />
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!wsConnected) {
+    return (
+      <Alert className="border-yellow-500/50 bg-yellow-500/10 mb-4" data-testid="alert-ws-disconnected">
+        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+        <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="flex items-center gap-2">
+            <span className="font-medium text-yellow-600 dark:text-yellow-400">انقطاع الاتصال بالخادم</span>
+            <span className="text-sm text-muted-foreground">جاري إعادة المحاولة...</span>
+          </span>
+          <Button variant="ghost" size="icon" onClick={onDismiss} data-testid="button-dismiss-ws-alert">
+            <X className="h-4 w-4" />
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <Alert className="border-red-500/50 bg-red-500/10 mb-4" data-testid="alert-disconnected">
+        <WifiOff className="h-4 w-4 text-red-500" />
+        <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="flex items-center gap-2">
+            <span className="font-medium text-red-600 dark:text-red-400">غير متصل بواتساب</span>
+            <span className="text-sm text-muted-foreground">اذهب إلى تبويب الاتصال لربط جهازك</span>
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onReconnect} data-testid="button-reconnect">
+              <RefreshCw className="h-3 w-3 mr-1" />
+              إعادة الاتصال
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onDismiss} data-testid="button-dismiss-disconnect-alert">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return null;
+}
+
 export default function Dashboard() {
   const { toast } = useToast();
-  const { subscribe } = useWebSocket();
+  const { subscribe, wsConnected } = useWebSocket();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<BotStatus | null>(null);
   const [reconnectingData, setReconnectingData] = useState<ReconnectingData | null>(null);
+  const [alertDismissed, setAlertDismissed] = useState(false);
+  const [previousConnectedState, setPreviousConnectedState] = useState<boolean | null>(null);
+  const [previousWsConnected, setPreviousWsConnected] = useState<boolean | null>(null);
 
   const { data: status, isLoading: statusLoading } = useQuery<BotStatus>({
     queryKey: ['/api/status'],
@@ -253,6 +371,50 @@ export default function Dashboard() {
     }
   }, [isConnected, reconnectingData]);
 
+  useEffect(() => {
+    if (previousConnectedState !== null && previousConnectedState !== isConnected) {
+      setAlertDismissed(false);
+      
+      if (isConnected) {
+        toast({ 
+          title: 'تم الاتصال بنجاح', 
+          description: 'واتساب متصل الآن ويعمل بشكل طبيعي',
+        });
+      } else if (!isReconnecting) {
+        toast({ 
+          title: 'انقطع الاتصال', 
+          description: 'تم قطع اتصال واتساب',
+          variant: 'destructive'
+        });
+      }
+    }
+    setPreviousConnectedState(isConnected);
+  }, [isConnected, isReconnecting, previousConnectedState, toast]);
+
+  useEffect(() => {
+    if (previousWsConnected !== null && previousWsConnected !== wsConnected) {
+      setAlertDismissed(false);
+      
+      if (!wsConnected) {
+        toast({ 
+          title: 'انقطاع الاتصال بالخادم', 
+          description: 'جاري إعادة الاتصال تلقائياً...',
+          variant: 'destructive'
+        });
+      } else if (previousWsConnected === false) {
+        toast({ 
+          title: 'تم استعادة الاتصال', 
+          description: 'الاتصال بالخادم يعمل بشكل طبيعي',
+        });
+      }
+    }
+    setPreviousWsConnected(wsConnected);
+  }, [wsConnected, previousWsConnected, toast]);
+
+  if (statusLoading && !liveStatus) {
+    return <InitialLoadingScreen />;
+  }
+
   const handleToggleConnection = () => {
     if (isConnected) {
       disconnectMutation.mutate();
@@ -299,6 +461,17 @@ export default function Dashboard() {
       />
       
       <main className="container px-4 py-6 space-y-6">
+        <ConnectionStatusAlert
+          isConnected={isConnected}
+          isReconnecting={isReconnecting}
+          reconnectAttempt={reconnectingData?.attempt}
+          maxReconnectAttempts={reconnectingData?.maxAttempts}
+          wsConnected={wsConnected}
+          onReconnect={() => connectMutation.mutate()}
+          onDismiss={() => setAlertDismissed(true)}
+          visible={!alertDismissed}
+        />
+        
         <StatusCard 
           status={isConnected ? "connected" : (isReconnecting ? "reconnecting" : (connectMutation.isPending ? "connecting" : "disconnected"))} 
           messagesCount={messagesCount}

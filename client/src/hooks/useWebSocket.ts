@@ -1,11 +1,18 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { wsClient } from '@/lib/websocket';
 
 export function useWebSocket() {
+  const [wsConnected, setWsConnected] = useState(wsClient.isConnected);
+
   useEffect(() => {
     wsClient.connect();
+    
+    const unsubConnection = wsClient.subscribeToConnection((connected) => {
+      setWsConnected(connected);
+    });
+
     return () => {
-      // Don't disconnect on unmount since we want persistent connection
+      unsubConnection();
     };
   }, []);
 
@@ -13,5 +20,5 @@ export function useWebSocket() {
     return wsClient.subscribe(type, handler);
   }, []);
 
-  return { subscribe };
+  return { subscribe, wsConnected };
 }
