@@ -1,32 +1,42 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Wifi, WifiOff, Bot, MessageSquare, Users, Phone } from "lucide-react";
+import { Wifi, WifiOff, Bot, MessageSquare, Users, Phone, RefreshCw } from "lucide-react";
 
 interface StatusCardProps {
-  status: "connected" | "disconnected" | "connecting";
+  status: "connected" | "disconnected" | "connecting" | "reconnecting";
   messagesCount: number;
   usersCount: number;
   connectedNumber?: string | null;
+  reconnectAttempt?: number;
+  maxReconnectAttempts?: number;
 }
 
-export default function StatusCard({ status, messagesCount, usersCount, connectedNumber }: StatusCardProps) {
+export default function StatusCard({ status, messagesCount, usersCount, connectedNumber, reconnectAttempt, maxReconnectAttempts }: StatusCardProps) {
   const statusConfig = {
     connected: {
       icon: Wifi,
-      label: "Connected",
+      label: "متصل",
       color: "bg-green-500",
       badgeVariant: "default" as const,
     },
     disconnected: {
       icon: WifiOff,
-      label: "Disconnected",
+      label: "غير متصل",
       color: "bg-red-500",
       badgeVariant: "destructive" as const,
     },
     connecting: {
       icon: Wifi,
-      label: "Connecting...",
+      label: "جاري الاتصال...",
       color: "bg-yellow-500",
+      badgeVariant: "secondary" as const,
+    },
+    reconnecting: {
+      icon: RefreshCw,
+      label: reconnectAttempt && maxReconnectAttempts 
+        ? `إعادة الاتصال (${reconnectAttempt}/${maxReconnectAttempts})`
+        : "إعادة الاتصال...",
+      color: "bg-orange-500",
       badgeVariant: "secondary" as const,
     },
   };

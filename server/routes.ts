@@ -88,6 +88,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcast({ type: 'sessions', data: whatsappService.getLinkedSessions() });
   });
 
+  whatsappService.on('reconnecting', (data: { sessionId: string; attempt: number; maxAttempts: number }) => {
+    broadcast({ type: 'reconnecting', data });
+  });
+
+  whatsappService.on('reconnectFailed', (data: { sessionId: string; attempts: number }) => {
+    broadcast({ type: 'reconnectFailed', data });
+  });
+
   whatsappService.on('message', (message: WhatsAppMessage) => {
     const sessionId = message.sessionId || 'default';
     const user = userStore.getOrCreateUser(message.from, sessionId);

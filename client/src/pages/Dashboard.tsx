@@ -43,6 +43,13 @@ interface BotStatus {
   messagesCount: number;
   usersCount: number;
   safeModeEnabled?: boolean;
+  isReconnecting?: boolean;
+}
+
+interface ReconnectingData {
+  sessionId: string;
+  attempt: number;
+  maxAttempts: number;
 }
 
 interface BotSettings {
@@ -58,6 +65,7 @@ export default function Dashboard() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<BotStatus | null>(null);
+  const [reconnectingData, setReconnectingData] = useState<ReconnectingData | null>(null);
 
   const { data: status, isLoading: statusLoading } = useQuery<BotStatus>({
     queryKey: ['/api/status'],
@@ -198,6 +206,23 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/status'] });
     });
 
+    const unsubReconnecting = subscribe('reconnecting', (data: ReconnectingData) => {
+      setReconnectingData(data);
+      toast({ 
+        title: 'جاري إعادة الاتصال...', 
+        description: `المحاولة ${data.attempt} من ${data.maxAttempts}`,
+      });
+    });
+
+    const unsubReconnectFailed = subscribe('reconnectFailed', (data: { sessionId: string; attempts: number }) => {
+      setReconnectingData(null);
+      toast({ 
+        title: 'فشل إعادة الاتصال', 
+        description: `فشلت جميع المحاولات (${data.attempts}). يرجى إعادة الاتصال يدوياً.`,
+        variant: 'destructive'
+      });
+    });
+
     return () => {
       unsubStatus();
       unsubQR();
@@ -212,12 +237,21 @@ export default function Dashboard() {
       unsubSessionStatus();
       unsubSessions();
       unsubSessionTerminated();
+      unsubReconnecting();
+      unsubReconnectFailed();
     };
   }, [subscribe, toast]);
 
   const currentStatus = liveStatus || status;
   const isConnected = currentStatus?.isReady || false;
+  const isReconnecting = reconnectingData !== null || currentStatus?.isReconnecting || false;
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+  
+  useEffect(() => {
+    if (isConnected && reconnectingData) {
+      setReconnectingData(null);
+    }
+  }, [isConnected, reconnectingData]);
 
   const handleToggleConnection = () => {
     if (isConnected) {
@@ -266,10 +300,12 @@ export default function Dashboard() {
       
       <main className="container px-4 py-6 space-y-6">
         <StatusCard 
-          status={isConnected ? "connected" : (connectMutation.isPending ? "connecting" : "disconnected")} 
+          status={isConnected ? "connected" : (isReconnecting ? "reconnecting" : (connectMutation.isPending ? "connecting" : "disconnected"))} 
           messagesCount={messagesCount}
           usersCount={usersCount}
           connectedNumber={connectedNumber}
+          reconnectAttempt={reconnectingData?.attempt}
+          maxReconnectAttempts={reconnectingData?.maxAttempts}
         />
 
         <Tabs defaultValue="conversations" className="w-full">

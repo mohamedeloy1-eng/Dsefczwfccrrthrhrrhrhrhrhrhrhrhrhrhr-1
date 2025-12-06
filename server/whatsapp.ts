@@ -81,7 +81,7 @@ export interface LinkedSession {
 class WhatsAppSession extends EventEmitter {
   public client: ClientType | null = null;
   public sessionId: string;
-  public status: WhatsAppStatus = {
+  public status: WhatsAppStatus & { isReconnecting?: boolean } = {
     isConnected: false,
     isReady: false,
     qrCode: null,
@@ -97,6 +97,13 @@ class WhatsAppSession extends EventEmitter {
   private pendingPairingNumber: string | null = null;
   private pairingResolver: ((result: { success: boolean; code?: string; error?: string }) => void) | null = null;
   private messageHandler: ((message: WhatsAppMessage) => Promise<string | null>) | null = null;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
+  private reconnectDelay: number = 5000;
+  private isManualDisconnect: boolean = false;
+  private autoReconnectEnabled: boolean = true;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private isReconnectInProgress: boolean = false;
 
   constructor(sessionId: string) {
     super();
@@ -174,6 +181,9 @@ class WhatsAppSession extends EventEmitter {
       this.status.isReady = true;
       this.status.qrCode = null;
       this.status.pairingCode = null;
+      this.status.isReconnecting = false;
+      this.reconnectAttempts = 0;
+      this.isManualDisconnect = false;
       this.sessionStartTime = new Date();
       this.whatsappConnectTime = new Date();
       this.botRepliesCount = 0;
@@ -206,15 +216,20 @@ class WhatsAppSession extends EventEmitter {
       this.emit('status', this.status);
     });
 
-    this.client.on('disconnected', (reason: string) => {
+    this.client.on('disconnected', async (reason: string) => {
       console.log(`WhatsApp session ${this.sessionId} disconnected:`, reason);
+      const wasConnected = this.status.isConnected && this.status.isReady;
       this.status.isConnected = false;
       this.status.isReady = false;
       this.status.qrCode = null;
-      this.status.connectedNumber = null;
       this.status.pairingCode = null;
       this.emit('disconnected', reason);
       this.emit('status', this.status);
+      
+      if (wasConnected && this.autoReconnectEnabled && !this.isManualDisconnect && !this.pairingMode) {
+        console.log(`Auto-reconnect enabled for session ${this.sessionId}, attempting to reconnect...`);
+        this.attemptReconnect();
+      }
     });
 
     this.client.on('message', async (message: Message) => {
@@ -249,6 +264,81 @@ class WhatsAppSession extends EventEmitter {
 
   setMessageHandler(handler: (message: WhatsAppMessage) => Promise<string | null>): void {
     this.messageHandler = handler;
+  }
+
+  private async attemptReconnect(): Promise<void> {
+    if (this.isReconnectInProgress) {
+      console.log(`Reconnect already in progress for session ${this.sessionId}, skipping`);
+      return;
+    }
+
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log(`Max reconnect attempts (${this.maxReconnectAttempts}) reached for session ${this.sessionId}`);
+      this.reconnectAttempts = 0;
+      this.status.isReconnecting = false;
+      this.isReconnectInProgress = false;
+      this.emit('reconnectFailed', { sessionId: this.sessionId, attempts: this.maxReconnectAttempts });
+      this.emit('status', this.status);
+      return;
+    }
+
+    this.isReconnectInProgress = true;
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * this.reconnectAttempts;
+    console.log(`Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} for session ${this.sessionId} in ${delay}ms`);
+    
+    this.status.isReconnecting = true;
+    this.emit('reconnecting', { sessionId: this.sessionId, attempt: this.reconnectAttempts, maxAttempts: this.maxReconnectAttempts });
+    this.emit('status', this.status);
+
+    await new Promise<void>((resolve) => {
+      this.reconnectTimeout = setTimeout(() => {
+        this.reconnectTimeout = null;
+        resolve();
+      }, delay);
+    });
+
+    if (this.isManualDisconnect || !this.autoReconnectEnabled) {
+      console.log(`Reconnect cancelled for session ${this.sessionId}`);
+      this.status.isReconnecting = false;
+      this.isReconnectInProgress = false;
+      this.reconnectAttempts = 0;
+      this.emit('status', this.status);
+      return;
+    }
+
+    try {
+      if (this.client) {
+        try {
+          await this.client.destroy();
+        } catch (destroyErr) {
+          console.error(`Error destroying client during reconnect for session ${this.sessionId}:`, destroyErr);
+        }
+        this.client = null;
+      }
+      
+      this.isReconnectInProgress = false;
+      await this.initialize();
+      console.log(`Reconnect successful for session ${this.sessionId}`);
+    } catch (err) {
+      console.error(`Reconnect failed for session ${this.sessionId}:`, err);
+      this.isReconnectInProgress = false;
+      await this.attemptReconnect();
+    }
+  }
+
+  private cancelReconnect(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    this.isReconnectInProgress = false;
+    this.reconnectAttempts = 0;
+    this.status.isReconnecting = false;
+  }
+
+  setAutoReconnect(enabled: boolean): void {
+    this.autoReconnectEnabled = enabled;
   }
 
   getStatus(): WhatsAppStatus {
@@ -324,7 +414,12 @@ class WhatsAppSession extends EventEmitter {
     });
   }
 
-  async disconnect(): Promise<void> {
+  async disconnect(manual: boolean = true): Promise<void> {
+    if (manual) {
+      this.isManualDisconnect = true;
+      this.cancelReconnect();
+    }
+    
     if (this.client) {
       try {
         await this.client.destroy();
@@ -339,12 +434,14 @@ class WhatsAppSession extends EventEmitter {
           connectedNumber: null,
           pairingCode: null,
           isSuspended: false,
+          isReconnecting: false,
         };
         this.pairingMode = false;
         this.pendingPairingNumber = null;
         this.pairingResolver = null;
         this.sessionStartTime = null;
         this.whatsappConnectTime = null;
+        this.reconnectAttempts = 0;
         this.emit('status', this.status);
       }
     }
