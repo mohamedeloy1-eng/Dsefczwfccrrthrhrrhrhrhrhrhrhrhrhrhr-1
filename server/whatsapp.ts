@@ -151,6 +151,9 @@ class WhatsAppSession extends EventEmitter {
       await this.client.initialize();
     } catch (err) {
       console.error(`Error initializing WhatsApp session ${this.sessionId}:`, err);
+      this.status.isReconnecting = false;
+      this.isReconnectInProgress = false;
+      this.emit('status', this.status);
       throw err;
     }
   }
@@ -212,6 +215,18 @@ class WhatsAppSession extends EventEmitter {
       console.error(`WhatsApp session ${this.sessionId} authentication failed:`, msg);
       this.status.isConnected = false;
       this.status.isReady = false;
+      
+      if (this.status.isReconnecting) {
+        console.log(`Auth failure during reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          console.log(`Max reconnect attempts reached due to auth failures for session ${this.sessionId}`);
+          this.status.isReconnecting = false;
+          this.isReconnectInProgress = false;
+          this.reconnectAttempts = 0;
+          this.emit('reconnectFailed', { sessionId: this.sessionId, attempts: this.maxReconnectAttempts });
+        }
+      }
+      
       this.emit('auth_failure', msg);
       this.emit('status', this.status);
     });
