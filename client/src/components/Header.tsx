@@ -48,6 +48,7 @@ export default function Header({ isConnected, onToggleConnection }: HeaderProps)
             variant={isConnected ? "destructive" : "default"}
             size="sm"
             onClick={onToggleConnection}
+            className={!isConnected ? "animate-glow-pulse btn-shadow" : ""}
             data-testid="button-toggle-connection"
           >
             {isConnected ? (

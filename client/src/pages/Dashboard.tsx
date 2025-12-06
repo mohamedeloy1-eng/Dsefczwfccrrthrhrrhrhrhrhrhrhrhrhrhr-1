@@ -454,13 +454,13 @@ export default function Dashboard() {
   const connectedNumber = currentStatus?.connectedNumber || null;
 
   return (
-    <div className="min-h-screen bg-background" data-testid="dashboard-page">
+    <div className="min-h-screen bg-background relative z-10" data-testid="dashboard-page">
       <Header 
         isConnected={isConnected} 
         onToggleConnection={handleToggleConnection} 
       />
       
-      <main className="container px-4 py-6 space-y-6">
+      <main className="container px-4 py-6 space-y-6 animate-fade-in">
         <ConnectionStatusAlert
           isConnected={isConnected}
           isReconnecting={isReconnecting}
@@ -481,43 +481,43 @@ export default function Dashboard() {
           maxReconnectAttempts={reconnectingData?.maxAttempts}
         />
 
-        <Tabs defaultValue="conversations" className="w-full">
-          <TabsList className="grid w-full grid-cols-8 max-w-5xl">
-            <TabsTrigger value="conversations" className="gap-2" data-testid="tab-conversations">
+        <Tabs defaultValue="conversations" className="w-full animate-fade-in-up">
+          <TabsList className="grid w-full grid-cols-8 max-w-5xl dark:bg-card/60 dark:backdrop-blur-md dark:border-white/5">
+            <TabsTrigger value="conversations" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-conversations">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">المحادثات</span>
             </TabsTrigger>
-            <TabsTrigger value="contacts" className="gap-2" data-testid="tab-contacts">
+            <TabsTrigger value="contacts" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-contacts">
               <Contact className="h-4 w-4" />
               <span className="hidden sm:inline">جهات الاتصال</span>
             </TabsTrigger>
-            <TabsTrigger value="sessions" className="gap-2" data-testid="tab-linked-sessions">
+            <TabsTrigger value="sessions" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-linked-sessions">
               <Link2 className="h-4 w-4" />
               <span className="hidden sm:inline">الجلسات</span>
             </TabsTrigger>
-            <TabsTrigger value="session" className="gap-2" data-testid="tab-session">
+            <TabsTrigger value="session" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-session">
               <Activity className="h-4 w-4" />
               <span className="hidden sm:inline">المراقبة</span>
             </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2" data-testid="tab-users">
+            <TabsTrigger value="users" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-users">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">المستخدمين</span>
             </TabsTrigger>
-            <TabsTrigger value="security" className="gap-2" data-testid="tab-security">
+            <TabsTrigger value="security" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-security">
               <Shield className={`h-4 w-4 ${currentStatus?.safeModeEnabled ? 'text-red-500' : ''}`} />
               <span className="hidden sm:inline">الأمان</span>
             </TabsTrigger>
-            <TabsTrigger value="connection" className="gap-2" data-testid="tab-connection">
+            <TabsTrigger value="connection" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-connection">
               <QrCode className="h-4 w-4" />
               <span className="hidden sm:inline">الاتصال</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2" data-testid="tab-settings">
+            <TabsTrigger value="settings" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-settings">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">الإعدادات</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="conversations" className="mt-6">
+          <TabsContent value="conversations" className="mt-6 animate-fade-in-up">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <ConversationList
                 conversations={conversations}
@@ -530,7 +530,7 @@ export default function Dashboard() {
                   userName={selectedConversation.name}
                 />
               ) : (
-                <div className="hidden lg:flex items-center justify-center h-[450px] bg-muted/30 rounded-lg">
+                <div className="hidden lg:flex items-center justify-center h-[450px] bg-muted/30 dark:bg-card/40 dark:backdrop-blur-sm rounded-lg border dark:border-white/5">
                   <p className="text-muted-foreground">
                     {conversationsLoading ? 'جاري تحميل المحادثات...' : 'اختر محادثة للعرض'}
                   </p>
@@ -539,27 +539,27 @@ export default function Dashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="contacts" className="mt-6">
+          <TabsContent value="contacts" className="mt-6 animate-fade-in-up">
             <ContactsConversations />
           </TabsContent>
 
-          <TabsContent value="sessions" className="mt-6">
+          <TabsContent value="sessions" className="mt-6 animate-fade-in-up">
             <LinkedSessions />
           </TabsContent>
 
-          <TabsContent value="session" className="mt-6">
+          <TabsContent value="session" className="mt-6 animate-fade-in-up">
             <SessionMonitor />
           </TabsContent>
 
-          <TabsContent value="users" className="mt-6">
+          <TabsContent value="users" className="mt-6 animate-fade-in-up">
             <UserManagement />
           </TabsContent>
 
-          <TabsContent value="security" className="mt-6">
+          <TabsContent value="security" className="mt-6 animate-fade-in-up">
             <SecurityPanel safeModeEnabled={currentStatus?.safeModeEnabled || false} />
           </TabsContent>
 
-          <TabsContent value="connection" className="mt-6">
+          <TabsContent value="connection" className="mt-6 animate-fade-in-up">
             <div className="max-w-md mx-auto">
               <QRCodeDisplay
                 qrCode={qrCode || currentStatus?.qrCode || null}
@@ -574,7 +574,7 @@ export default function Dashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="settings" className="mt-6">
+          <TabsContent value="settings" className="mt-6 animate-fade-in-up">
             <div className="max-w-lg mx-auto">
               <SettingsPanel
                 botName={settings?.botName || "GX-MODY"}
