@@ -69,7 +69,7 @@ class ConversationStore {
       conversation = {
         id: randomUUID(),
         phoneNumber: normalizedPhone,
-        name: `User ${normalizedPhone.slice(-4)}`,
+        name: `+${normalizedPhone}`,
         lastMessage: content,
         timestamp: this.formatTimestamp(timestamp),
         unreadCount: isBot ? 0 : 1,

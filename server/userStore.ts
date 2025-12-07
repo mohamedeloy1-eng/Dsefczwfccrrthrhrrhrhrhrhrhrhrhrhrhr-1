@@ -45,7 +45,7 @@ class UserStore {
       user = {
         id: randomUUID(),
         phoneNumber: normalizedPhone,
-        name: `User ${normalizedPhone.slice(-4)}`,
+        name: `+${normalizedPhone}`,
         classification: 'normal',
         isBlocked: false,
         messageLimit: this.securitySettings.defaultMessageLimit,
