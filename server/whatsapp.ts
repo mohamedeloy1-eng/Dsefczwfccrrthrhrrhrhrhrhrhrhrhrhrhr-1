@@ -704,26 +704,32 @@ class WhatsAppSession extends EventEmitter {
     }
 
     try {
-      const contacts = await this.client.getContacts();
-      return contacts
-        .filter(contact => !contact.isGroup && contact.id._serialized !== 'status@broadcast')
-        .map(contact => {
-          const phoneNumber = contact.id.user || '';
-          const displayName = contact.name || contact.pushname || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
-          return {
-            id: contact.id._serialized,
-            phoneNumber: phoneNumber,
-            name: displayName,
-            pushName: contact.pushname || null,
-            isMyContact: contact.isMyContact || false,
-            isGroup: contact.isGroup || false,
-            lastSeen: null,
-            profilePicUrl: null,
-          };
-        })
-        .slice(0, 200);
+      const chats = await this.client.getChats();
+      const contactsFromChats: WhatsAppContactInfo[] = [];
+      
+      for (const chat of chats) {
+        if (chat.isGroup || chat.id._serialized === 'status@broadcast') {
+          continue;
+        }
+        
+        const phoneNumber = chat.id.user || '';
+        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+        
+        contactsFromChats.push({
+          id: chat.id._serialized,
+          phoneNumber: phoneNumber,
+          name: displayName,
+          pushName: chat.name || null,
+          isMyContact: true,
+          isGroup: false,
+          lastSeen: null,
+          profilePicUrl: null,
+        });
+      }
+      
+      return contactsFromChats.slice(0, 200);
     } catch (err) {
-      console.error('Error fetching contacts:', err);
+      console.error('Error fetching contacts from chats:', err);
       return [];
     }
   }
