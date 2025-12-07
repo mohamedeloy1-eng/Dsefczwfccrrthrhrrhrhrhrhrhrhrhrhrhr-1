@@ -255,19 +255,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 'success'
               );
 
+              whatsappService.incrementBotReplies(sessionId);
               broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
               return null;
             } else {
               const errorMsg = `❌ فشل في إرسال ${isSticker ? 'الاستيكر' : 'الصورة'}. حاول مرة أخرى.`;
+              const timestamp = Math.floor(Date.now() / 1000);
+              conversationStore.addMessage(message.from, errorMsg, true, timestamp, sessionId);
               userStore.recordError(message.from, errorMsg, sessionId);
               logStore.logError(message.from, sessionId, errorMsg);
+              broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
               return errorMsg;
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('Error sending image:', err);
             const errorMsg = `❌ فشل في إرسال ${isSticker ? 'الاستيكر' : 'الصورة'}. حاول مرة أخرى.`;
-            const errorResult = userStore.recordError(message.from, errorMsg, sessionId);
-            logStore.logError(message.from, sessionId, errorMsg);
+            const timestamp = Math.floor(Date.now() / 1000);
+            conversationStore.addMessage(message.from, errorMsg, true, timestamp, sessionId);
+            const errorResult = userStore.recordError(message.from, err?.message || errorMsg, sessionId);
+            logStore.logError(message.from, sessionId, err?.message || errorMsg);
 
             if (errorResult.shouldBlock) {
               broadcast({ type: 'security', data: { 
@@ -277,12 +283,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }});
             }
 
+            broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
             return errorMsg;
           }
         } else {
-          const errorMsg = `❌ ${result.error || 'فشل في إنشاء الصورة. حاول مرة أخرى.'}`;
+          const errorMsg = result.error || '❌ فشل في إنشاء الصورة. حاول مرة أخرى.';
+          const timestamp = Math.floor(Date.now() / 1000);
+          conversationStore.addMessage(message.from, errorMsg, true, timestamp, sessionId);
           userStore.recordError(message.from, errorMsg, sessionId);
-          logStore.logError(message.from, sessionId, errorMsg);
+          logStore.logError(message.from, sessionId, `Image generation failed: ${result.errorCode || 'unknown'}`);
+          broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
           return errorMsg;
         }
       }

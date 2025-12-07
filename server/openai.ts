@@ -114,7 +114,7 @@ export async function webSearch(query: string): Promise<{ success: boolean; resu
   }
 }
 
-export async function generateImage(prompt: string): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
+export async function generateImage(prompt: string): Promise<{ success: boolean; imageUrl?: string; error?: string; errorCode?: string }> {
   try {
     const openai = getOpenAIClient();
     const response = await openai.images.generate({
@@ -129,17 +129,81 @@ export async function generateImage(prompt: string): Promise<{ success: boolean;
     if (imageUrl) {
       return { success: true, imageUrl };
     }
-    return { success: false, error: 'لم يتم إنشاء الصورة' };
+    return { success: false, error: 'لم يتم إنشاء الصورة. حاول مرة أخرى.', errorCode: 'no_image' };
   } catch (error: any) {
     console.error('DALL-E API error:', error?.message || error);
+    const errorCode = error?.code || error?.error?.code || 'unknown';
+    const errorStatus = error?.status;
     
-    if (error?.status === 429) {
-      return { success: false, error: 'الخدمة مشغولة، حاول لاحقاً' };
+    // Rate limiting
+    if (errorStatus === 429) {
+      return { 
+        success: false, 
+        error: '⏳ الخدمة مشغولة حالياً. حاول مرة أخرى بعد دقيقة.',
+        errorCode: 'rate_limit'
+      };
     }
-    if (error?.code === 'content_policy_violation') {
-      return { success: false, error: 'المحتوى المطلوب غير مسموح به' };
+    
+    // Content policy violations
+    if (errorCode === 'content_policy_violation' || error?.message?.includes('content policy')) {
+      return { 
+        success: false, 
+        error: '⚠️ لا يمكن إنشاء هذه الصورة لأنها تخالف سياسات المحتوى.\n\n💡 نصيحة: جرب وصفاً مختلفاً بدون محتوى عنيف أو غير لائق.',
+        errorCode: 'content_policy'
+      };
     }
-    return { success: false, error: error?.message || 'حدث خطأ في إنشاء الصورة' };
+    
+    // Billing/quota issues
+    if (errorStatus === 402 || errorCode === 'insufficient_quota') {
+      return { 
+        success: false, 
+        error: '💳 الحصة اليومية للصور انتهت. حاول لاحقاً.',
+        errorCode: 'quota_exceeded'
+      };
+    }
+    
+    // Authentication errors
+    if (errorStatus === 401) {
+      return { 
+        success: false, 
+        error: '🔑 خطأ في إعدادات الخدمة. تواصل مع المسؤول.',
+        errorCode: 'auth_error'
+      };
+    }
+    
+    // Invalid prompt (too long, etc.)
+    if (errorCode === 'invalid_prompt' || error?.message?.includes('prompt')) {
+      return { 
+        success: false, 
+        error: '📝 الوصف طويل جداً أو غير مفهوم. جرب وصفاً أقصر وأوضح.',
+        errorCode: 'invalid_prompt'
+      };
+    }
+    
+    // Server errors
+    if (errorStatus >= 500) {
+      return { 
+        success: false, 
+        error: '🔧 خطأ في الخادم. حاول مرة أخرى بعد قليل.',
+        errorCode: 'server_error'
+      };
+    }
+    
+    // Network/timeout errors
+    if (error?.code === 'ECONNRESET' || error?.code === 'ETIMEDOUT' || error?.message?.includes('timeout')) {
+      return { 
+        success: false, 
+        error: '📶 انقطع الاتصال. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.',
+        errorCode: 'network_error'
+      };
+    }
+    
+    // Generic fallback with guidance
+    return { 
+      success: false, 
+      error: '❌ فشل إنشاء الصورة. جرب وصفاً مختلفاً أو حاول لاحقاً.',
+      errorCode: 'unknown'
+    };
   }
 }
 
