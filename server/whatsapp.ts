@@ -704,32 +704,51 @@ class WhatsAppSession extends EventEmitter {
     }
 
     try {
-      const chats = await this.client.getChats();
-      const contactsFromChats: WhatsAppContactInfo[] = [];
+      // استخدام getContacts() الفعلية بدلاً من getChats()
+      const contacts = await this.client.getContacts();
+      const contactsList: WhatsAppContactInfo[] = [];
       
-      for (const chat of chats) {
-        if (chat.isGroup || chat.id._serialized === 'status@broadcast') {
+      for (const contact of contacts) {
+        // تخطي المجموعات والحسابات الرسمية والبث
+        if (contact.isGroup || contact.isBusiness === undefined && contact.id._serialized === 'status@broadcast') {
           continue;
         }
         
-        const phoneNumber = chat.id.user || '';
-        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+        // التحقق من أن جهة الاتصال هي جهة اتصال فعلية وليست مجموعة
+        if (contact.id._serialized.includes('@g.us') || contact.id._serialized === 'status@broadcast') {
+          continue;
+        }
         
-        contactsFromChats.push({
-          id: chat.id._serialized,
+        const phoneNumber = contact.id.user || contact.number || '';
+        const displayName = contact.name || contact.pushname || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+        
+        // فقط إضافة جهات الاتصال التي لديها رقم هاتف
+        if (!phoneNumber) {
+          continue;
+        }
+        
+        contactsList.push({
+          id: contact.id._serialized,
           phoneNumber: phoneNumber,
           name: displayName,
-          pushName: chat.name || null,
-          isMyContact: true,
+          pushName: contact.pushname || null,
+          isMyContact: contact.isMyContact || false,
           isGroup: false,
           lastSeen: null,
           profilePicUrl: null,
         });
       }
       
-      return contactsFromChats.slice(0, 200);
+      // ترتيب جهات الاتصال: جهات الاتصال المحفوظة أولاً، ثم بالاسم
+      contactsList.sort((a, b) => {
+        if (a.isMyContact && !b.isMyContact) return -1;
+        if (!a.isMyContact && b.isMyContact) return 1;
+        return a.name.localeCompare(b.name, 'ar');
+      });
+      
+      return contactsList.slice(0, 500);
     } catch (err) {
-      console.error('Error fetching contacts from chats:', err);
+      console.error('Error fetching contacts:', err);
       return [];
     }
   }
