@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { whatsappService, type WhatsAppMessage, type WhatsAppContactInfo, type WhatsAppChatInfo, type SessionDetails, type LinkedSession } from "./whatsapp";
-import { generateResponse, generateImage, updateSettings, getSettings, clearConversationHistory, clearAllConversations } from "./openai";
+import { generateResponse, generateImage, webSearch, updateSettings, getSettings, clearConversationHistory, clearAllConversations } from "./openai";
 import { conversationStore } from "./conversationStore";
 import { userStore } from "./userStore";
 import { logStore } from "./logStore";
@@ -170,6 +170,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         /^sticker[:\s]+(.+)/i,
         /^ملصق[:\s]+(.+)/i,
       ];
+      
+      const searchPatterns = [
+        /^بحث[:\s]+(.+)/i,
+        /^search[:\s]+(.+)/i,
+        /^ابحث[:\s]+(.+)/i,
+        /^ابحث عن[:\s]+(.+)/i,
+      ];
+      
+      let searchQuery: string | null = null;
+      for (const pattern of searchPatterns) {
+        const match = message.body.match(pattern);
+        if (match) {
+          searchQuery = match[1].trim();
+          break;
+        }
+      }
+      
+      if (searchQuery) {
+        const result = await webSearch(searchQuery);
+        
+        if (result.success && result.result) {
+          const searchResponse = `🔍 *نتائج البحث:*\n\n${result.result}`;
+          const timestamp = Math.floor(Date.now() / 1000);
+          conversationStore.addMessage(message.from, searchResponse, true, timestamp, sessionId);
+          
+          logStore.logOutgoingMessage(
+            message.from,
+            sessionId,
+            searchResponse,
+            'text',
+            'success'
+          );
+
+          whatsappService.incrementBotReplies(sessionId);
+          broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+          return searchResponse;
+        } else {
+          const errorMsg = `❌ ${result.error || 'فشل في البحث. حاول مرة أخرى.'}`;
+          userStore.recordError(message.from, errorMsg, sessionId);
+          logStore.logError(message.from, sessionId, errorMsg);
+          return errorMsg;
+        }
+      }
       
       let imagePrompt: string | null = null;
       let isSticker = false;
