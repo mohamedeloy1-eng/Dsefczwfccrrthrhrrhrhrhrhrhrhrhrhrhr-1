@@ -704,35 +704,52 @@ class WhatsAppSession extends EventEmitter {
     }
 
     try {
-      // استخدام getContacts() الفعلية بدلاً من getChats()
-      const contacts = await this.client.getContacts();
+      // استخدام getChats() لاستخراج جهات الاتصال بدلاً من getContacts() التي تفشل
+      const chats = await this.client.getChats();
       const contactsList: WhatsAppContactInfo[] = [];
+      const seenNumbers = new Set<string>();
       
-      for (const contact of contacts) {
-        // تخطي المجموعات والحسابات الرسمية والبث
-        if (contact.isGroup || contact.isBusiness === undefined && contact.id._serialized === 'status@broadcast') {
+      for (const chat of chats) {
+        // تخطي المجموعات والبث
+        if (chat.isGroup || chat.id._serialized === 'status@broadcast') {
           continue;
         }
         
-        // التحقق من أن جهة الاتصال هي جهة اتصال فعلية وليست مجموعة
-        if (contact.id._serialized.includes('@g.us') || contact.id._serialized === 'status@broadcast') {
+        // التحقق من أنها محادثة فردية
+        if (chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
           continue;
         }
         
-        const phoneNumber = contact.id.user || contact.number || '';
-        const displayName = contact.name || contact.pushname || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+        const phoneNumber = chat.id.user || '';
         
-        // فقط إضافة جهات الاتصال التي لديها رقم هاتف
-        if (!phoneNumber) {
+        // تخطي الأرقام المكررة
+        if (!phoneNumber || seenNumbers.has(phoneNumber)) {
           continue;
+        }
+        seenNumbers.add(phoneNumber);
+        
+        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+        
+        // محاولة الحصول على معلومات جهة الاتصال
+        let isMyContact = false;
+        let pushName: string | null = null;
+        
+        try {
+          const contact = await chat.getContact();
+          if (contact) {
+            isMyContact = contact.isMyContact || false;
+            pushName = contact.pushname || null;
+          }
+        } catch (e) {
+          // تجاهل الخطأ
         }
         
         contactsList.push({
-          id: contact.id._serialized,
+          id: chat.id._serialized,
           phoneNumber: phoneNumber,
           name: displayName,
-          pushName: contact.pushname || null,
-          isMyContact: contact.isMyContact || false,
+          pushName: pushName,
+          isMyContact: isMyContact,
           isGroup: false,
           lastSeen: null,
           profilePicUrl: null,
@@ -748,7 +765,7 @@ class WhatsAppSession extends EventEmitter {
       
       return contactsList.slice(0, 500);
     } catch (err) {
-      console.error('Error fetching contacts:', err);
+      console.error('Error fetching contacts from chats:', err);
       return [];
     }
   }

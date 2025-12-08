@@ -122,7 +122,8 @@ export default function ContactsConversations() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const isConnected = activeSessions.length > 0 || contactsData?.phoneNumber;
+  const isConnected = activeSessions.length > 0 || (contactsData?.phoneNumber && contactsData.phoneNumber !== null);
+  const hasContacts = (contactsData?.contacts?.length ?? 0) > 0 || (contactsData?.recentChats?.length ?? 0) > 0;
   
   if (isLoading) {
     return (
