@@ -256,6 +256,16 @@ class WhatsAppSession extends EventEmitter {
     });
 
     this.client.on('message', async (message: Message) => {
+      // تجاهل الرسائل القديمة (قبل بدء الجلسة)
+      const messageTime = message.timestamp * 1000; // تحويل لـ milliseconds
+      const sessionStartMs = this.sessionStartTime?.getTime() || Date.now();
+      
+      // تجاهل الرسائل التي أرسلت قبل أكثر من 30 ثانية من بدء الجلسة
+      if (messageTime < sessionStartMs - 30000) {
+        console.log(`Ignoring old message from ${message.from} (sent before session started)`);
+        return;
+      }
+      
       console.log(`Message received on session ${this.sessionId} from:`, message.from);
       
       const whatsappMessage: WhatsAppMessage = {
@@ -670,6 +680,16 @@ class WhatsAppSession extends EventEmitter {
     });
 
     this.client.on('message', async (message: Message) => {
+      // تجاهل الرسائل القديمة (قبل بدء الجلسة)
+      const messageTime = message.timestamp * 1000; // تحويل لـ milliseconds
+      const sessionStartMs = this.sessionStartTime?.getTime() || Date.now();
+      
+      // تجاهل الرسائل التي أرسلت قبل أكثر من 30 ثانية من بدء الجلسة
+      if (messageTime < sessionStartMs - 30000) {
+        console.log(`Ignoring old message from ${message.from} (sent before session started)`);
+        return;
+      }
+      
       const whatsappMessage: WhatsAppMessage = {
         id: message.id._serialized,
         from: message.from,
@@ -775,182 +795,10 @@ class WhatsAppSession extends EventEmitter {
       return [];
     }
 
-    try {
-      console.log(`Session ${this.sessionId}: Starting to fetch contacts...`);
-      
-      // استخدام client.getContacts() مع مهلة زمنية لتجنب التعليق
-      const contacts = await this.withTimeout(
-        this.client.getContacts(),
-        15000, // 15 ثانية مهلة
-        [] as any[]
-      );
-      
-      if (contacts.length === 0) {
-        console.log(`Session ${this.sessionId}: getContacts() returned empty or timed out, trying getChats()...`);
-        return this.getContactsFromChats();
-      }
-      
-      console.log(`Session ${this.sessionId}: Fetched ${contacts.length} contacts from WhatsApp`);
-      
-      const contactsList: WhatsAppContactInfo[] = [];
-      const seenNumbers = new Set<string>();
-      
-      for (const contact of contacts) {
-        // تخطي جهات اتصال النظام والمجموعات
-        if (!contact.id || !contact.id._serialized) {
-          continue;
-        }
-        
-        // تخطي المجموعات والبث
-        if (contact.isGroup || contact.id._serialized.includes('@g.us') || contact.id._serialized === 'status@broadcast') {
-          continue;
-        }
-        
-        // تخطي جهات اتصال النظام مثل 0@c.us
-        if (contact.id._serialized === '0@c.us' || contact.id.user === '0') {
-          continue;
-        }
-        
-        const phoneNumber = contact.id.user || '';
-        
-        // تخطي الأرقام المكررة والفارغة
-        if (!phoneNumber || seenNumbers.has(phoneNumber)) {
-          continue;
-        }
-        seenNumbers.add(phoneNumber);
-        
-        // استخدام الاسم المحفوظ أو pushname أو رقم الهاتف
-        const displayName = contact.name || contact.pushname || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
-        
-        contactsList.push({
-          id: contact.id._serialized,
-          phoneNumber: phoneNumber,
-          name: displayName,
-          pushName: contact.pushname || null,
-          isMyContact: contact.isMyContact || false,
-          isGroup: false,
-          lastSeen: null,
-          profilePicUrl: null,
-        });
-      }
-      
-      // إذا لم نحصل على جهات اتصال كافية، نحاول من المحادثات كبديل
-      if (contactsList.length < 10) {
-        console.log(`Session ${this.sessionId}: Few contacts found (${contactsList.length}), supplementing from chats...`);
-        try {
-          const chats = await this.client.getChats();
-          for (const chat of chats) {
-            if (chat.isGroup || chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
-              continue;
-            }
-            
-            const phoneNumber = chat.id.user || '';
-            if (!phoneNumber || seenNumbers.has(phoneNumber)) {
-              continue;
-            }
-            seenNumbers.add(phoneNumber);
-            
-            const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
-            
-            let isMyContact = false;
-            let pushName: string | null = null;
-            
-            try {
-              const contact = await chat.getContact();
-              if (contact) {
-                isMyContact = contact.isMyContact || false;
-                pushName = contact.pushname || null;
-              }
-            } catch (e) {
-              // تجاهل الخطأ
-            }
-            
-            contactsList.push({
-              id: chat.id._serialized,
-              phoneNumber: phoneNumber,
-              name: displayName,
-              pushName: pushName,
-              isMyContact: isMyContact,
-              isGroup: false,
-              lastSeen: null,
-              profilePicUrl: null,
-            });
-          }
-        } catch (chatErr) {
-          console.error(`Error supplementing contacts from chats:`, chatErr);
-        }
-      }
-      
-      console.log(`Session ${this.sessionId}: Total contacts after processing: ${contactsList.length}`);
-      
-      // ترتيب جهات الاتصال: جهات الاتصال المحفوظة أولاً، ثم بالاسم
-      contactsList.sort((a, b) => {
-        if (a.isMyContact && !b.isMyContact) return -1;
-        if (!a.isMyContact && b.isMyContact) return 1;
-        return a.name.localeCompare(b.name, 'ar');
-      });
-      
-      return contactsList.slice(0, 1000);
-    } catch (err) {
-      console.error(`Error fetching contacts for session ${this.sessionId}:`, err);
-      
-      // محاولة بديلة: جلب من المحادثات
-      try {
-        console.log(`Session ${this.sessionId}: Falling back to chats for contacts...`);
-        const chats = await this.client.getChats();
-        const contactsList: WhatsAppContactInfo[] = [];
-        const seenNumbers = new Set<string>();
-        
-        for (const chat of chats) {
-          if (chat.isGroup || chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
-            continue;
-          }
-          
-          const phoneNumber = chat.id.user || '';
-          if (!phoneNumber || seenNumbers.has(phoneNumber)) {
-            continue;
-          }
-          seenNumbers.add(phoneNumber);
-          
-          const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
-          
-          let isMyContact = false;
-          let pushName: string | null = null;
-          
-          try {
-            const contact = await chat.getContact();
-            if (contact) {
-              isMyContact = contact.isMyContact || false;
-              pushName = contact.pushname || null;
-            }
-          } catch (e) {
-            // تجاهل الخطأ
-          }
-          
-          contactsList.push({
-            id: chat.id._serialized,
-            phoneNumber: phoneNumber,
-            name: displayName,
-            pushName: pushName,
-            isMyContact: isMyContact,
-            isGroup: false,
-            lastSeen: null,
-            profilePicUrl: null,
-          });
-        }
-        
-        contactsList.sort((a, b) => {
-          if (a.isMyContact && !b.isMyContact) return -1;
-          if (!a.isMyContact && b.isMyContact) return 1;
-          return a.name.localeCompare(b.name, 'ar');
-        });
-        
-        return contactsList.slice(0, 1000);
-      } catch (fallbackErr) {
-        console.error(`Error in fallback contacts fetch:`, fallbackErr);
-        return [];
-      }
-    }
+    // استخدام getChats مباشرة لأن getContacts() تفشل في بعض إصدارات WhatsApp Web
+    // خطأ: window.Store.ContactMethods.getIsMyContact is not a function
+    console.log(`Session ${this.sessionId}: Fetching contacts from chats (primary method)...`);
+    return this.getContactsFromChats();
   }
 
   async getChats(): Promise<WhatsAppChatInfo[]> {
