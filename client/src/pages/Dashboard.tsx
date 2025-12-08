@@ -265,12 +265,16 @@ export default function Dashboard() {
       }
     });
 
-    const unsubQR = subscribe('qr', (data: string) => {
-      setQrCode(data);
+    const unsubQR = subscribe('qr', (data: { qrCode: string; sessionId: string }) => {
+      if (data.sessionId === 'default') {
+        setQrCode(data.qrCode);
+      }
     });
 
-    const unsubPairingCode = subscribe('pairingCode', (data: string) => {
-      setPairingCode(data);
+    const unsubPairingCode = subscribe('pairingCode', (data: { code: string; sessionId: string }) => {
+      if (data.sessionId === 'default') {
+        setPairingCode(data.code);
+      }
     });
 
     const unsubMessage = subscribe('message', () => {
@@ -437,7 +441,7 @@ export default function Dashboard() {
 
   const handleRequestPairingCode = async (phoneNumber: string): Promise<{ success: boolean; code?: string; error?: string }> => {
     try {
-      const response = await apiRequest('POST', '/api/request-pairing-code', { phoneNumber });
+      const response = await apiRequest('POST', '/api/request-pairing-code', { phoneNumber, sessionId: 'default' });
       const result = await response.json() as { success: boolean; code?: string; error?: string };
       if (result.success && result.code) {
         setPairingCode(result.code);

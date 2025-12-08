@@ -75,12 +75,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcast({ type: 'sessions', data: whatsappService.getLinkedSessions() });
   });
 
-  whatsappService.on('qr', (qrCode: string) => {
-    broadcast({ type: 'qr', data: qrCode });
+  whatsappService.on('qr', (data: { qrCode: string; sessionId: string }) => {
+    broadcast({ type: 'qr', data: { qrCode: data.qrCode, sessionId: data.sessionId } });
   });
 
-  whatsappService.on('pairingCode', (code: string) => {
-    broadcast({ type: 'pairingCode', data: code });
+  whatsappService.on('pairingCode', (data: { code: string; sessionId: string }) => {
+    broadcast({ type: 'pairingCode', data: { code: data.code, sessionId: data.sessionId } });
   });
 
   whatsappService.on('sessionTerminated', (sessionId: string) => {

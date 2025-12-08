@@ -112,7 +112,7 @@ class ConversationStore {
   getAllSessionsConversations(): ConversationData[] {
     const allConversations: ConversationData[] = [];
     this.sessionConversations.forEach((conversations) => {
-      allConversations.push(...conversations.values());
+      allConversations.push(...Array.from(conversations.values()));
     });
     return allConversations.sort((a, b) => {
       const timeA = a.messages[a.messages.length - 1];

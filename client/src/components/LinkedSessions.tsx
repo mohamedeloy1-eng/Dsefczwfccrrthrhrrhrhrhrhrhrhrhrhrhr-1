@@ -69,15 +69,15 @@ export default function LinkedSessions() {
   });
 
   useEffect(() => {
-    const unsubQR = subscribe('qr', (data: string) => {
-      if (showLinkingPanel) {
-        setQrCode(data);
+    const unsubQR = subscribe('qr', (data: { qrCode: string; sessionId: string }) => {
+      if (showLinkingPanel && data.sessionId === newSessionId) {
+        setQrCode(data.qrCode);
       }
     });
 
-    const unsubPairingCode = subscribe('pairingCode', (data: string) => {
-      if (showLinkingPanel) {
-        setPairingCode(data);
+    const unsubPairingCode = subscribe('pairingCode', (data: { code: string; sessionId: string }) => {
+      if (showLinkingPanel && data.sessionId === newSessionId) {
+        setPairingCode(data.code);
       }
     });
 

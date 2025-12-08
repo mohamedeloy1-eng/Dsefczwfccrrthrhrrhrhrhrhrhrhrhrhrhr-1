@@ -1006,11 +1006,11 @@ class WhatsAppService extends EventEmitter {
       });
       
       session.on('qr', (qrCode) => {
-        this.emit('qr', qrCode);
+        this.emit('qr', { qrCode, sessionId });
       });
       
       session.on('pairingCode', (code) => {
-        this.emit('pairingCode', code);
+        this.emit('pairingCode', { code, sessionId });
       });
       
       session.on('message', (message) => {
