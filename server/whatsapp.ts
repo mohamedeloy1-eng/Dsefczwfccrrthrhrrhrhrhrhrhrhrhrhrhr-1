@@ -714,14 +714,82 @@ class WhatsAppSession extends EventEmitter {
     await this.initialize();
   }
 
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) => setTimeout(() => {
+        console.log(`Session ${this.sessionId}: Operation timed out after ${timeoutMs}ms`);
+        resolve(fallback);
+      }, timeoutMs))
+    ]);
+  }
+
+  private async getContactsFromChats(): Promise<WhatsAppContactInfo[]> {
+    if (!this.client || !this.status.isReady) {
+      return [];
+    }
+
+    try {
+      console.log(`Session ${this.sessionId}: Fetching contacts from chats...`);
+      const chats = await this.withTimeout(this.client.getChats(), 15000, [] as any[]);
+      const contactsList: WhatsAppContactInfo[] = [];
+      const seenNumbers = new Set<string>();
+
+      for (const chat of chats) {
+        if (chat.isGroup || chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
+          continue;
+        }
+
+        const phoneNumber = chat.id.user || '';
+        if (!phoneNumber || seenNumbers.has(phoneNumber)) {
+          continue;
+        }
+        seenNumbers.add(phoneNumber);
+
+        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+
+        contactsList.push({
+          id: chat.id._serialized,
+          phoneNumber: phoneNumber,
+          name: displayName,
+          pushName: null,
+          isMyContact: false,
+          isGroup: false,
+          lastSeen: null,
+          profilePicUrl: null,
+        });
+      }
+
+      console.log(`Session ${this.sessionId}: Got ${contactsList.length} contacts from chats`);
+
+      contactsList.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      return contactsList.slice(0, 500);
+    } catch (err) {
+      console.error(`Session ${this.sessionId}: Error getting contacts from chats:`, err);
+      return [];
+    }
+  }
+
   async getContacts(): Promise<WhatsAppContactInfo[]> {
     if (!this.client || !this.status.isReady) {
       return [];
     }
 
     try {
-      // استخدام client.getContacts() الأصلية للحصول على جميع جهات الاتصال
-      const contacts = await this.client.getContacts();
+      console.log(`Session ${this.sessionId}: Starting to fetch contacts...`);
+      
+      // استخدام client.getContacts() مع مهلة زمنية لتجنب التعليق
+      const contacts = await this.withTimeout(
+        this.client.getContacts(),
+        15000, // 15 ثانية مهلة
+        [] as any[]
+      );
+      
+      if (contacts.length === 0) {
+        console.log(`Session ${this.sessionId}: getContacts() returned empty or timed out, trying getChats()...`);
+        return this.getContactsFromChats();
+      }
+      
       console.log(`Session ${this.sessionId}: Fetched ${contacts.length} contacts from WhatsApp`);
       
       const contactsList: WhatsAppContactInfo[] = [];
