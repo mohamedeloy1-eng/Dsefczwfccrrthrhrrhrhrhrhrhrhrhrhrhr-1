@@ -201,6 +201,14 @@ class WhatsAppSession extends EventEmitter {
         console.error('Error getting client info:', err);
       }
       
+      // تفعيل المزامنة الكاملة لجهات الاتصال عن طريق تحديث حالة الحضور
+      try {
+        await this.client!.sendPresenceAvailable();
+        console.log(`Session ${this.sessionId}: Presence set to available for full sync`);
+      } catch (err) {
+        console.error(`Error setting presence for session ${this.sessionId}:`, err);
+      }
+      
       this.emit('ready');
       this.emit('status', this.status);
     });
@@ -617,6 +625,14 @@ class WhatsAppSession extends EventEmitter {
         console.error('Error getting client info:', err);
       }
       
+      // تفعيل المزامنة الكاملة لجهات الاتصال عن طريق تحديث حالة الحضور
+      try {
+        await this.client!.sendPresenceAvailable();
+        console.log(`Session ${this.sessionId}: Presence set to available for full sync (pairing mode)`);
+      } catch (err) {
+        console.error(`Error setting presence for session ${this.sessionId}:`, err);
+      }
+      
       this.pairingMode = false;
       this.emit('ready');
       this.emit('status', this.status);
@@ -704,57 +720,100 @@ class WhatsAppSession extends EventEmitter {
     }
 
     try {
-      // استخدام getChats() لاستخراج جهات الاتصال بدلاً من getContacts() التي تفشل
-      const chats = await this.client.getChats();
+      // استخدام client.getContacts() الأصلية للحصول على جميع جهات الاتصال
+      const contacts = await this.client.getContacts();
+      console.log(`Session ${this.sessionId}: Fetched ${contacts.length} contacts from WhatsApp`);
+      
       const contactsList: WhatsAppContactInfo[] = [];
       const seenNumbers = new Set<string>();
       
-      for (const chat of chats) {
+      for (const contact of contacts) {
+        // تخطي جهات اتصال النظام والمجموعات
+        if (!contact.id || !contact.id._serialized) {
+          continue;
+        }
+        
         // تخطي المجموعات والبث
-        if (chat.isGroup || chat.id._serialized === 'status@broadcast') {
+        if (contact.isGroup || contact.id._serialized.includes('@g.us') || contact.id._serialized === 'status@broadcast') {
           continue;
         }
         
-        // التحقق من أنها محادثة فردية
-        if (chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
+        // تخطي جهات اتصال النظام مثل 0@c.us
+        if (contact.id._serialized === '0@c.us' || contact.id.user === '0') {
           continue;
         }
         
-        const phoneNumber = chat.id.user || '';
+        const phoneNumber = contact.id.user || '';
         
-        // تخطي الأرقام المكررة
+        // تخطي الأرقام المكررة والفارغة
         if (!phoneNumber || seenNumbers.has(phoneNumber)) {
           continue;
         }
         seenNumbers.add(phoneNumber);
         
-        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
-        
-        // محاولة الحصول على معلومات جهة الاتصال
-        let isMyContact = false;
-        let pushName: string | null = null;
-        
-        try {
-          const contact = await chat.getContact();
-          if (contact) {
-            isMyContact = contact.isMyContact || false;
-            pushName = contact.pushname || null;
-          }
-        } catch (e) {
-          // تجاهل الخطأ
-        }
+        // استخدام الاسم المحفوظ أو pushname أو رقم الهاتف
+        const displayName = contact.name || contact.pushname || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
         
         contactsList.push({
-          id: chat.id._serialized,
+          id: contact.id._serialized,
           phoneNumber: phoneNumber,
           name: displayName,
-          pushName: pushName,
-          isMyContact: isMyContact,
+          pushName: contact.pushname || null,
+          isMyContact: contact.isMyContact || false,
           isGroup: false,
           lastSeen: null,
           profilePicUrl: null,
         });
       }
+      
+      // إذا لم نحصل على جهات اتصال كافية، نحاول من المحادثات كبديل
+      if (contactsList.length < 10) {
+        console.log(`Session ${this.sessionId}: Few contacts found (${contactsList.length}), supplementing from chats...`);
+        try {
+          const chats = await this.client.getChats();
+          for (const chat of chats) {
+            if (chat.isGroup || chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
+              continue;
+            }
+            
+            const phoneNumber = chat.id.user || '';
+            if (!phoneNumber || seenNumbers.has(phoneNumber)) {
+              continue;
+            }
+            seenNumbers.add(phoneNumber);
+            
+            const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+            
+            let isMyContact = false;
+            let pushName: string | null = null;
+            
+            try {
+              const contact = await chat.getContact();
+              if (contact) {
+                isMyContact = contact.isMyContact || false;
+                pushName = contact.pushname || null;
+              }
+            } catch (e) {
+              // تجاهل الخطأ
+            }
+            
+            contactsList.push({
+              id: chat.id._serialized,
+              phoneNumber: phoneNumber,
+              name: displayName,
+              pushName: pushName,
+              isMyContact: isMyContact,
+              isGroup: false,
+              lastSeen: null,
+              profilePicUrl: null,
+            });
+          }
+        } catch (chatErr) {
+          console.error(`Error supplementing contacts from chats:`, chatErr);
+        }
+      }
+      
+      console.log(`Session ${this.sessionId}: Total contacts after processing: ${contactsList.length}`);
       
       // ترتيب جهات الاتصال: جهات الاتصال المحفوظة أولاً، ثم بالاسم
       contactsList.sort((a, b) => {
@@ -763,10 +822,66 @@ class WhatsAppSession extends EventEmitter {
         return a.name.localeCompare(b.name, 'ar');
       });
       
-      return contactsList.slice(0, 500);
+      return contactsList.slice(0, 1000);
     } catch (err) {
-      console.error('Error fetching contacts from chats:', err);
-      return [];
+      console.error(`Error fetching contacts for session ${this.sessionId}:`, err);
+      
+      // محاولة بديلة: جلب من المحادثات
+      try {
+        console.log(`Session ${this.sessionId}: Falling back to chats for contacts...`);
+        const chats = await this.client.getChats();
+        const contactsList: WhatsAppContactInfo[] = [];
+        const seenNumbers = new Set<string>();
+        
+        for (const chat of chats) {
+          if (chat.isGroup || chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
+            continue;
+          }
+          
+          const phoneNumber = chat.id.user || '';
+          if (!phoneNumber || seenNumbers.has(phoneNumber)) {
+            continue;
+          }
+          seenNumbers.add(phoneNumber);
+          
+          const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
+          
+          let isMyContact = false;
+          let pushName: string | null = null;
+          
+          try {
+            const contact = await chat.getContact();
+            if (contact) {
+              isMyContact = contact.isMyContact || false;
+              pushName = contact.pushname || null;
+            }
+          } catch (e) {
+            // تجاهل الخطأ
+          }
+          
+          contactsList.push({
+            id: chat.id._serialized,
+            phoneNumber: phoneNumber,
+            name: displayName,
+            pushName: pushName,
+            isMyContact: isMyContact,
+            isGroup: false,
+            lastSeen: null,
+            profilePicUrl: null,
+          });
+        }
+        
+        contactsList.sort((a, b) => {
+          if (a.isMyContact && !b.isMyContact) return -1;
+          if (!a.isMyContact && b.isMyContact) return 1;
+          return a.name.localeCompare(b.name, 'ar');
+        });
+        
+        return contactsList.slice(0, 1000);
+      } catch (fallbackErr) {
+        console.error(`Error in fallback contacts fetch:`, fallbackErr);
+        return [];
+      }
     }
   }
 
