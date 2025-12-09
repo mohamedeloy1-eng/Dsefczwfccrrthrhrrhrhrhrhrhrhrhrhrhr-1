@@ -119,8 +119,23 @@ export default function ContactsConversations() {
   );
 
   const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    if (!name) return '??';
+    const parts = name.split(' ').filter(n => n.length > 0);
+    if (parts.length === 0) return '??';
+    return parts.map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length > 10) {
+      return `+${cleaned.slice(0, -10)} ${cleaned.slice(-10, -7)} ${cleaned.slice(-7, -4)} ${cleaned.slice(-4)}`;
+    }
+    return `+${cleaned}`;
+  };
+
+  const myContacts = (contactsData?.contacts || []).filter(c => c.isMyContact);
+  const otherContacts = (contactsData?.contacts || []).filter(c => !c.isMyContact);
 
   const isConnected = activeSessions.length > 0 || (contactsData?.phoneNumber && contactsData.phoneNumber !== null);
   const hasContacts = (contactsData?.contacts?.length ?? 0) > 0 || (contactsData?.recentChats?.length ?? 0) > 0;
@@ -310,9 +325,18 @@ export default function ContactsConversations() {
                     <div className="flex flex-col items-center justify-center py-8">
                       <Users className="h-12 w-12 text-muted-foreground/50 mb-2" />
                       <p className="text-muted-foreground">لا توجد جهات اتصال</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {searchQuery ? 'جرب البحث بكلمة مختلفة' : 'سيتم تحميل جهات الاتصال عند توفرها'}
+                      </p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
+                      {filteredContacts.length > 0 && (
+                        <p className="text-xs text-muted-foreground px-3 pb-2">
+                          {filteredContacts.length} جهة اتصال
+                          {myContacts.length > 0 && ` (${myContacts.length} محفوظة)`}
+                        </p>
+                      )}
                       {filteredContacts.map((contact) => (
                         <div
                           key={contact.id}
@@ -320,20 +344,25 @@ export default function ContactsConversations() {
                           data-testid={`contact-row-${contact.phoneNumber}`}
                         >
                           <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-primary/10 text-primary">
+                            <AvatarFallback className={contact.isMyContact ? "bg-green-500/10 text-green-600" : "bg-primary/10 text-primary"}>
                               {getInitials(contact.name)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{contact.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium truncate">{contact.name}</p>
+                              {contact.pushName && contact.pushName !== contact.name && (
+                                <span className="text-xs text-muted-foreground truncate">({contact.pushName})</span>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground" dir="ltr">
-                              {contact.phoneNumber}
+                              {formatPhoneNumber(contact.phoneNumber)}
                             </p>
                           </div>
                           {contact.isMyContact && (
-                            <Badge variant="outline" className="shrink-0">
+                            <Badge variant="secondary" className="shrink-0 bg-green-500/10 text-green-600 border-green-500/20">
                               <User className="h-3 w-3 ml-1" />
-                              جهة اتصال
+                              محفوظة
                             </Badge>
                           )}
                         </div>
