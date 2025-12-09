@@ -882,10 +882,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let sessionId = req.query.sessionId as string | undefined;
       
       if (!sessionId) {
+        // First try to find any ready session
         const linkedSessions = whatsappService.getLinkedSessions();
         const readySession = linkedSessions.find(s => s.isConnected && s.isReady);
         if (readySession) {
           sessionId = readySession.id;
+        } else {
+          // Fall back to default session
+          sessionId = 'default';
         }
       }
       
