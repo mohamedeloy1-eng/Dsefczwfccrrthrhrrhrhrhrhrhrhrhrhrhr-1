@@ -1,0 +1,61 @@
+2025/12/12-23:12:22.076 6e4 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/12-23:12:22.076 6e4 Recovering log #230
+2025/12/12-23:12:22.110 6e4 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000230.log 
+2025/12/12-23:12:23.107 6ed Level-0 table #243: started
+2025/12/12-23:12:23.155 6ed Level-0 table #243: 588604 bytes OK
+2025/12/12-23:12:23.163 6ed Delete type=0 #230
+2025/12/12-23:12:23.164 6ec Manual compaction at level-0 from '\x00'\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00(\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/12-23:12:23.167 6ea Level-0 table #245: started
+2025/12/12-23:12:23.169 6ea Level-0 table #245: 436 bytes OK
+2025/12/12-23:12:23.173 6ea Delete type=0 #242
+2025/12/12-23:12:23.174 6ec Manual compaction at level-0 from '\x00(\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00)\x00\x00\x00' @ 0 : 0; will stop at '\x00(\x00\x00\x05' @ 972394 : 0
+2025/12/12-23:12:23.174 6ec Compacting 1@0 + 1@1 files
+2025/12/12-23:12:23.192 6ec Generated table #246@0: 18168 keys, 323859 bytes
+2025/12/12-23:12:23.192 6ec Compacted 1@0 + 1@1 files => 323859 bytes
+2025/12/12-23:12:23.197 6ec compacted to: files[ 0 1 8 0 0 0 0 ]
+2025/12/12-23:12:23.197 6ec Delete type=2 #245
+2025/12/12-23:12:23.197 6ec Manual compaction at level-0 from '\x00(\x00\x00\x05' @ 972394 : 0 .. '\x00)\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/12-23:12:23.268 6e6 Compacting 1@1 + 8@2 files
+2025/12/12-23:12:23.372 6e6 Generated table #247@1: 48817 keys, 2211495 bytes
+2025/12/12-23:12:23.437 6e6 Generated table #248@1: 13087 keys, 2177565 bytes
+2025/12/12-23:12:23.502 6e6 Generated table #249@1: 3058 keys, 2164647 bytes
+2025/12/12-23:12:23.578 6e6 Generated table #250@1: 3547 keys, 2167884 bytes
+2025/12/12-23:12:23.654 6e6 Generated table #251@1: 13171 keys, 2179226 bytes
+2025/12/12-23:12:23.750 6e6 Generated table #252@1: 27218 keys, 2267428 bytes
+2025/12/12-23:12:23.834 6e6 Generated table #253@1: 55348 keys, 2236326 bytes
+2025/12/12-23:12:23.864 6e6 Generated table #254@1: 34961 keys, 765822 bytes
+2025/12/12-23:12:23.864 6e6 Compacted 1@1 + 8@2 files => 16170393 bytes
+2025/12/12-23:12:23.871 6e6 compacted to: files[ 0 0 8 0 0 0 0 ]
+2025/12/12-23:12:23.872 6e6 Delete type=2 #233
+2025/12/12-23:12:23.872 6e6 Delete type=2 #234
+2025/12/12-23:12:23.872 6e6 Delete type=2 #235
+2025/12/12-23:12:23.872 6e6 Delete type=2 #236
+2025/12/12-23:12:23.872 6e6 Delete type=2 #237
+2025/12/12-23:12:23.872 6e6 Delete type=2 #238
+2025/12/12-23:12:23.872 6e6 Delete type=2 #239
+2025/12/12-23:12:23.872 6e6 Delete type=2 #240
+2025/12/12-23:12:23.872 6e6 Delete type=2 #243
+2025/12/12-23:12:23.872 6e6 Delete type=2 #246
+2025/12/12-23:13:18.592 6e6 Level-0 table #256: started
+2025/12/12-23:13:18.649 6e6 Level-0 table #256: 1080532 bytes OK
+2025/12/12-23:13:18.657 6e6 Delete type=0 #244
+2025/12/12-23:13:20.559 6e6 Compacting 1@1 + 8@2 files
+2025/12/12-23:13:20.649 6e6 Generated table #257@1: 49591 keys, 2213323 bytes
+2025/12/12-23:13:20.761 6e6 Generated table #258@1: 15190 keys, 2180428 bytes
+2025/12/12-23:13:20.812 6e6 Generated table #259@1: 3049 keys, 2165064 bytes
+2025/12/12-23:13:20.864 6e6 Generated table #260@1: 3539 keys, 2166241 bytes
+2025/12/12-23:13:20.925 6e6 Generated table #261@1: 11909 keys, 2177778 bytes
+2025/12/12-23:13:21.035 6e6 Generated table #262@1: 27631 keys, 2266756 bytes
+2025/12/12-23:13:21.116 6e6 Generated table #263@1: 48194 keys, 2230659 bytes
+2025/12/12-23:13:21.159 6e6 Generated table #264@1: 53582 keys, 1151825 bytes
+2025/12/12-23:13:21.160 6e6 Compacted 1@1 + 8@2 files => 16552074 bytes
+2025/12/12-23:13:21.164 6e6 compacted to: files[ 0 0 8 0 0 0 0 ]
+2025/12/12-23:13:21.164 6e6 Delete type=2 #247
+2025/12/12-23:13:21.164 6e6 Delete type=2 #248
+2025/12/12-23:13:21.164 6e6 Delete type=2 #249
+2025/12/12-23:13:21.164 6e6 Delete type=2 #250
+2025/12/12-23:13:21.164 6e6 Delete type=2 #251
+2025/12/12-23:13:21.164 6e6 Delete type=2 #252
+2025/12/12-23:13:21.164 6e6 Delete type=2 #253
+2025/12/12-23:13:21.164 6e6 Delete type=2 #254
+2025/12/12-23:13:21.164 6e6 Delete type=2 #256
