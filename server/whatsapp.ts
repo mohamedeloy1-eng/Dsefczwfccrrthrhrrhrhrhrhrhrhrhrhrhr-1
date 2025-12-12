@@ -965,7 +965,7 @@ class WhatsAppSession extends EventEmitter {
       console.log(`Session ${this.sessionId}: No contacts from API, trying chats as fallback...`);
       const chatContacts = await this.getContactsFromChats();
       console.log(`Session ${this.sessionId}: Got ${chatContacts.length} contacts from chats (fallback)`);
-      return chatContacts.slice(0, 500);
+      return chatContacts;
     }
     
     const savedContacts = realContacts.filter(c => c.isMyContact);
@@ -990,7 +990,7 @@ class WhatsAppSession extends EventEmitter {
     const allContacts = [...savedContacts, ...otherContacts];
     
     console.log(`Session ${this.sessionId}: Final contacts: ${allContacts.length} total (${savedContacts.length} saved, ${otherContacts.length} others)`);
-    return allContacts.slice(0, 500);
+    return allContacts;
   }
 
   async getChats(): Promise<WhatsAppChatInfo[]> {
