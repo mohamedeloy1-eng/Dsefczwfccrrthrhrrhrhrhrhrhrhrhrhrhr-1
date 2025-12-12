@@ -960,25 +960,41 @@ class WhatsAppSession extends EventEmitter {
     }
 
     try {
-      const chats = await this.client.getChats();
-      return chats.map(chat => {
-        const phoneNumber = chat.id.user || '';
-        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : `Chat`);
-        return {
-          id: chat.id._serialized,
-          phoneNumber: phoneNumber,
-          name: displayName,
-          lastMessage: chat.lastMessage?.body || null,
-          timestamp: chat.lastMessage?.timestamp 
-            ? new Date(chat.lastMessage.timestamp * 1000).toLocaleString('ar-EG')
-            : null,
-          unreadCount: chat.unreadCount || 0,
-          isPinned: chat.pinned || false,
-          isGroup: chat.isGroup || false,
-          isArchived: chat.archived || false,
-          isMuted: chat.isMuted || false,
-        };
-      });
+      const chats = await this.withTimeout(this.client.getChats(), 15000, [] as any[]);
+      
+      if (!chats || chats.length === 0) {
+        return [];
+      }
+      
+      const chatList: WhatsAppChatInfo[] = [];
+      
+      for (const chat of chats) {
+        try {
+          if (!chat || !chat.id) continue;
+          
+          const phoneNumber = chat.id?.user || '';
+          const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : `Chat`);
+          
+          chatList.push({
+            id: chat.id._serialized || '',
+            phoneNumber: phoneNumber,
+            name: displayName,
+            lastMessage: chat.lastMessage?.body || null,
+            timestamp: chat.lastMessage?.timestamp 
+              ? new Date(chat.lastMessage.timestamp * 1000).toLocaleString('ar-EG')
+              : null,
+            unreadCount: chat.unreadCount || 0,
+            isPinned: chat.pinned || false,
+            isGroup: chat.isGroup || false,
+            isArchived: chat.archived || false,
+            isMuted: chat.isMuted || false,
+          });
+        } catch (chatErr) {
+          continue;
+        }
+      }
+      
+      return chatList;
     } catch (err) {
       console.error('Error fetching chats:', err);
       return [];
@@ -986,15 +1002,25 @@ class WhatsAppSession extends EventEmitter {
   }
 
   async getPinnedChats(): Promise<WhatsAppChatInfo[]> {
-    const chats = await this.getChats();
-    return chats.filter(chat => chat.isPinned);
+    try {
+      const chats = await this.getChats();
+      return chats.filter(chat => chat.isPinned);
+    } catch (err) {
+      console.error('Error fetching pinned chats:', err);
+      return [];
+    }
   }
 
   async getRecentChats(limit: number = 20): Promise<WhatsAppChatInfo[]> {
-    const chats = await this.getChats();
-    return chats
-      .filter(chat => !chat.isArchived)
-      .slice(0, limit);
+    try {
+      const chats = await this.getChats();
+      return chats
+        .filter(chat => !chat.isArchived)
+        .slice(0, limit);
+    } catch (err) {
+      console.error('Error fetching recent chats:', err);
+      return [];
+    }
   }
 
   private formatDuration(startTime: Date | null): string {
