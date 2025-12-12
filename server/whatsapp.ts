@@ -751,7 +751,14 @@ class WhatsAppSession extends EventEmitter {
 
     try {
       console.log(`Session ${this.sessionId}: Attempting to fetch real contacts...`);
-      const contacts = await this.withTimeout(this.client.getContacts(), 20000, [] as any[]);
+      
+      let contacts: any[] = [];
+      try {
+        contacts = await this.withTimeout(this.client.getContacts(), 20000, [] as any[]);
+      } catch (getContactsErr) {
+        console.log(`Session ${this.sessionId}: getContacts() failed, will use chat-based contacts`);
+        return [];
+      }
       
       if (!contacts || contacts.length === 0) {
         console.log(`Session ${this.sessionId}: No contacts returned from getContacts()`);
@@ -765,13 +772,13 @@ class WhatsAppSession extends EventEmitter {
         try {
           if (!contact || !contact.id) continue;
           
-          const isGroup = contact.isGroup || contact.id._serialized.includes('@g.us');
+          const isGroup = contact.isGroup || (contact.id._serialized && contact.id._serialized.includes('@g.us'));
           if (isGroup) continue;
           
           if (contact.id._serialized === 'status@broadcast') continue;
           if (contact.isMe) continue;
           
-          const phoneNumber = contact.id.user || contact.number || '';
+          const phoneNumber = contact.id?.user || contact.number || '';
           if (!phoneNumber || seenNumbers.has(phoneNumber)) continue;
           seenNumbers.add(phoneNumber);
 
@@ -779,9 +786,13 @@ class WhatsAppSession extends EventEmitter {
           
           let isMyContact = false;
           try {
-            isMyContact = contact.isMyContact || false;
+            if (typeof contact.isMyContact === 'boolean') {
+              isMyContact = contact.isMyContact;
+            } else if (contact.name && contact.name !== contact.pushname && !contact.name.startsWith('+')) {
+              isMyContact = true;
+            }
           } catch {
-            isMyContact = !!contact.name && contact.name !== contact.pushname;
+            isMyContact = !!contact.name && contact.name !== contact.pushname && !contact.name.startsWith('+');
           }
 
           contactsList.push({
@@ -813,41 +824,72 @@ class WhatsAppSession extends EventEmitter {
     }
 
     try {
-      console.log(`Session ${this.sessionId}: Fetching contacts from chats (fallback)...`);
+      console.log(`Session ${this.sessionId}: Fetching contacts from chats...`);
       const chats = await this.withTimeout(this.client.getChats(), 15000, [] as any[]);
       const contactsList: WhatsAppContactInfo[] = [];
       const seenNumbers = new Set<string>();
 
       for (const chat of chats) {
-        if (chat.isGroup || chat.id._serialized.includes('@g.us') || chat.id._serialized === 'status@broadcast') {
-          continue;
-        }
-
-        const phoneNumber = chat.id.user || '';
-        if (!phoneNumber || seenNumbers.has(phoneNumber)) {
-          continue;
-        }
-        seenNumbers.add(phoneNumber);
-
-        const displayName = chat.name || (phoneNumber ? `+${phoneNumber}` : 'Unknown');
-        
-        let contact: any = null;
         try {
-          contact = await this.client!.getContactById(chat.id._serialized);
-        } catch {}
+          if (!chat || !chat.id) continue;
+          
+          const chatIdSerialized = chat.id._serialized || '';
+          if (chat.isGroup || chatIdSerialized.includes('@g.us') || chatIdSerialized === 'status@broadcast') {
+            continue;
+          }
 
-        const isMyContact = contact ? (contact.isMyContact || !!contact.name) : false;
+          const phoneNumber = chat.id?.user || '';
+          if (!phoneNumber || seenNumbers.has(phoneNumber)) {
+            continue;
+          }
+          seenNumbers.add(phoneNumber);
 
-        contactsList.push({
-          id: chat.id._serialized,
-          phoneNumber: phoneNumber,
-          name: displayName,
-          pushName: contact?.pushname || null,
-          isMyContact: isMyContact,
-          isGroup: false,
-          lastSeen: null,
-          profilePicUrl: null,
-        });
+          let contactName = chat.name || '';
+          let pushName: string | null = null;
+          let isMyContact = false;
+          
+          try {
+            const contact = await this.withTimeout(
+              this.client!.getContactById(chatIdSerialized),
+              5000,
+              null
+            );
+            
+            if (contact) {
+              if (contact.name) {
+                contactName = contact.name;
+              }
+              pushName = contact.pushname || null;
+              
+              try {
+                if (typeof contact.isMyContact === 'boolean') {
+                  isMyContact = contact.isMyContact;
+                } else if (contact.name && contact.name !== contact.pushname && !contact.name.startsWith('+')) {
+                  isMyContact = true;
+                }
+              } catch {
+                isMyContact = !!contact.name && contact.name !== contact.pushname && !contact.name.startsWith('+');
+              }
+            }
+          } catch {}
+
+          if (!contactName || contactName === phoneNumber) {
+            contactName = phoneNumber ? `+${phoneNumber}` : 'Unknown';
+          }
+
+          contactsList.push({
+            id: chatIdSerialized,
+            phoneNumber: phoneNumber,
+            name: contactName,
+            pushName: pushName,
+            isMyContact: isMyContact,
+            isGroup: false,
+            lastSeen: null,
+            profilePicUrl: null,
+          });
+        } catch (chatErr) {
+          continue;
+        }
       }
 
       console.log(`Session ${this.sessionId}: Got ${contactsList.length} contacts from chats`);
@@ -865,44 +907,51 @@ class WhatsAppSession extends EventEmitter {
 
     console.log(`Session ${this.sessionId}: Fetching contacts...`);
     
-    const realContacts = await this.getRealContacts();
+    const contactMap = new Map<string, WhatsAppContactInfo>();
     
-    if (realContacts.length > 0) {
-      const chatContacts = await this.getContactsFromChats();
-      const contactMap = new Map<string, WhatsAppContactInfo>();
-      
-      for (const contact of realContacts) {
+    const [realContacts, chatContacts] = await Promise.all([
+      this.getRealContacts(),
+      this.getContactsFromChats()
+    ]);
+    
+    for (const contact of realContacts) {
+      if (contact.phoneNumber) {
         contactMap.set(contact.phoneNumber, contact);
       }
-      
-      for (const chatContact of chatContacts) {
-        if (!contactMap.has(chatContact.phoneNumber)) {
-          contactMap.set(chatContact.phoneNumber, chatContact);
-        } else {
-          const existing = contactMap.get(chatContact.phoneNumber)!;
-          if (!existing.isMyContact && chatContact.isMyContact) {
-            existing.isMyContact = true;
-          }
-          if (!existing.pushName && chatContact.pushName) {
-            existing.pushName = chatContact.pushName;
-          }
-        }
-      }
-      
-      const allContacts = Array.from(contactMap.values());
-      allContacts.sort((a, b) => {
-        if (a.isMyContact && !b.isMyContact) return -1;
-        if (!a.isMyContact && b.isMyContact) return 1;
-        return a.name.localeCompare(b.name, 'ar');
-      });
-      
-      console.log(`Session ${this.sessionId}: Total contacts: ${allContacts.length}`);
-      return allContacts.slice(0, 500);
     }
     
-    const chatContacts = await this.getContactsFromChats();
-    chatContacts.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-    return chatContacts.slice(0, 500);
+    for (const chatContact of chatContacts) {
+      if (!chatContact.phoneNumber) continue;
+      
+      if (!contactMap.has(chatContact.phoneNumber)) {
+        contactMap.set(chatContact.phoneNumber, chatContact);
+      } else {
+        const existing = contactMap.get(chatContact.phoneNumber)!;
+        if (!existing.isMyContact && chatContact.isMyContact) {
+          existing.isMyContact = true;
+        }
+        if (!existing.pushName && chatContact.pushName) {
+          existing.pushName = chatContact.pushName;
+        }
+        if (existing.name.startsWith('+') && !chatContact.name.startsWith('+')) {
+          existing.name = chatContact.name;
+        }
+      }
+    }
+    
+    const allContacts = Array.from(contactMap.values());
+    allContacts.sort((a, b) => {
+      if (a.isMyContact && !b.isMyContact) return -1;
+      if (!a.isMyContact && b.isMyContact) return 1;
+      const aIsPhone = a.name.startsWith('+');
+      const bIsPhone = b.name.startsWith('+');
+      if (!aIsPhone && bIsPhone) return -1;
+      if (aIsPhone && !bIsPhone) return 1;
+      return a.name.localeCompare(b.name, 'ar');
+    });
+    
+    console.log(`Session ${this.sessionId}: Total contacts: ${allContacts.length} (${realContacts.length} from contacts, ${chatContacts.length} from chats)`);
+    return allContacts.slice(0, 500);
   }
 
   async getChats(): Promise<WhatsAppChatInfo[]> {
