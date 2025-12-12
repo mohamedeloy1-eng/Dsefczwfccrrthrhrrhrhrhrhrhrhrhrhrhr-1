@@ -63,21 +63,31 @@ interface BotSettings {
 
 function InitialLoadingScreen() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center" data-testid="loading-screen">
-      <div className="text-center space-y-4">
+    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden" data-testid="loading-screen">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-blue-500/5 pointer-events-none" />
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      
+      <div className="text-center space-y-6 relative z-10">
         <div className="relative">
-          <div className="w-16 h-16 mx-auto">
-            <Loader2 className="w-16 h-16 animate-spin text-primary" />
+          <div className="w-20 h-20 mx-auto relative">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary to-blue-500 animate-spin" style={{ animationDuration: '3s' }}>
+              <div className="absolute inset-1 rounded-full bg-background" />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            </div>
           </div>
+          <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl animate-pulse" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold">جاري التحميل...</h2>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">جاري التحميل...</h2>
           <p className="text-sm text-muted-foreground">يتم تحميل لوحة تحكم GX-MODY</p>
         </div>
-        <div className="flex justify-center gap-2 pt-4">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-20" />
+        <div className="flex justify-center gap-3 pt-4">
+          <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0s' }} />
+          <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.2s' }} />
+          <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.4s' }} />
         </div>
       </div>
     </div>
@@ -459,12 +469,17 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background relative z-10" data-testid="dashboard-page">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+      </div>
+      
       <Header 
         isConnected={isConnected} 
         onToggleConnection={handleToggleConnection} 
       />
       
-      <main className="container px-4 py-6 space-y-6 animate-fade-in">
+      <main className="container px-4 py-6 space-y-6 animate-fade-in relative z-10">
         <ConnectionStatusAlert
           isConnected={isConnected}
           isReconnecting={isReconnecting}
