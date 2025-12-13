@@ -20,11 +20,20 @@ import { Button } from "@/components/ui/button";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 
+type MessageType = "text" | "image" | "sticker" | "voice" | "error" | "system";
+
 interface Message {
   id: string;
   content: string;
   isBot: boolean;
   timestamp: string;
+  messageType?: MessageType;
+  mediaUrl?: string;
+  replyTo?: {
+    id: string;
+    content: string;
+    isBot: boolean;
+  };
 }
 
 interface Conversation {
@@ -32,8 +41,10 @@ interface Conversation {
   phoneNumber: string;
   name: string;
   lastMessage: string;
+  lastMessageType?: MessageType;
   timestamp: string;
   unreadCount: number;
+  isPinned?: boolean;
   messages: Message[];
 }
 
@@ -194,6 +205,8 @@ export default function Dashboard() {
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [previousConnectedState, setPreviousConnectedState] = useState<boolean | null>(null);
   const [previousWsConnected, setPreviousWsConnected] = useState<boolean | null>(null);
+  const [conversationSummary, setConversationSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const { data: status, isLoading: statusLoading } = useQuery<BotStatus>({
     queryKey: ['/api/status'],
@@ -380,6 +393,10 @@ export default function Dashboard() {
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
   
   useEffect(() => {
+    setConversationSummary(null);
+  }, [selectedConversationId]);
+  
+  useEffect(() => {
     if (isConnected && reconnectingData) {
       setReconnectingData(null);
     }
@@ -447,6 +464,41 @@ export default function Dashboard() {
 
   const handleSaveSettings = (newSettings: BotSettings) => {
     settingsMutation.mutate(newSettings);
+  };
+
+  const handleSummarize = async () => {
+    if (!selectedConversation) return;
+    
+    setIsSummarizing(true);
+    setConversationSummary(null);
+    
+    try {
+      const response = await apiRequest('POST', '/api/ai/summarize', {
+        messages: selectedConversation.messages.map(m => ({
+          content: m.content,
+          isBot: m.isBot
+        }))
+      });
+      const result = await response.json() as { success: boolean; summary?: string; error?: string };
+      
+      if (result.success && result.summary) {
+        setConversationSummary(result.summary);
+      } else {
+        toast({ 
+          title: 'فشل التلخيص', 
+          description: result.error || 'حدث خطأ أثناء تلخيص المحادثة',
+          variant: 'destructive' 
+        });
+      }
+    } catch (error: any) {
+      toast({ 
+        title: 'خطأ', 
+        description: error?.message || 'فشل في تلخيص المحادثة',
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   const handleRequestPairingCode = async (phoneNumber: string): Promise<{ success: boolean; code?: string; error?: string }> => {
@@ -547,6 +599,9 @@ export default function Dashboard() {
                 <ChatView
                   messages={selectedConversation.messages}
                   userName={selectedConversation.name}
+                  onSummarize={handleSummarize}
+                  isSummarizing={isSummarizing}
+                  summary={conversationSummary || undefined}
                 />
               ) : (
                 <div className="hidden lg:flex items-center justify-center h-[450px] bg-muted/30 dark:bg-card/40 dark:backdrop-blur-sm rounded-lg border dark:border-white/5">

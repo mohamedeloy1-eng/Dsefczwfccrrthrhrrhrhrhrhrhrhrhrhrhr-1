@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { whatsappService, type WhatsAppMessage, type WhatsAppContactInfo, type WhatsAppChatInfo, type SessionDetails, type LinkedSession } from "./whatsapp";
-import { generateResponse, generateImage, webSearch, updateSettings, getSettings, clearConversationHistory, clearAllConversations } from "./openai";
+import { generateResponse, generateImage, webSearch, updateSettings, getSettings, clearConversationHistory, clearAllConversations, summarizeConversation } from "./openai";
 import { conversationStore } from "./conversationStore";
 import { userStore } from "./userStore";
 import { logStore } from "./logStore";
@@ -579,6 +579,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { getConversationHistory } = require('./openai');
     const history = getConversationHistory(req.params.userId);
     res.json({ userId: req.params.userId, history });
+  });
+
+  app.post('/api/ai/summarize', async (req, res) => {
+    try {
+      const { messages, phoneNumber, sessionId } = req.body;
+      
+      let messagesToSummarize = messages;
+      
+      if (!messages && phoneNumber) {
+        const conversation = conversationStore.getConversation(phoneNumber, sessionId || 'default');
+        if (conversation) {
+          messagesToSummarize = conversation.messages.map(m => ({
+            content: m.content,
+            isBot: m.isBot
+          }));
+        }
+      }
+      
+      if (!messagesToSummarize || messagesToSummarize.length === 0) {
+        return res.status(400).json({ success: false, error: 'No messages to summarize' });
+      }
+      
+      const result = await summarizeConversation(messagesToSummarize);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message || 'Failed to summarize' });
+    }
   });
 
   app.delete('/api/ai/history/:userId', (req, res) => {

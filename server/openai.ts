@@ -217,6 +217,58 @@ export async function generateImage(prompt: string): Promise<{ success: boolean;
   }
 }
 
+export async function summarizeConversation(messages: { content: string; isBot: boolean }[]): Promise<{ success: boolean; summary?: string; error?: string }> {
+  if (messages.length === 0) {
+    return { success: false, error: 'No messages to summarize' };
+  }
+
+  try {
+    const openai = getOpenAIClient();
+    
+    const conversationText = messages.map(m => 
+      `${m.isBot ? 'Bot' : 'User'}: ${m.content}`
+    ).join('\n');
+
+    const response = await openai.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `أنت مساعد ذكي متخصص في تلخيص المحادثات. قم بتلخيص المحادثة التالية بشكل موجز وواضح.
+          
+اتبع هذه الإرشادات:
+1. اذكر الموضوع الرئيسي للمحادثة
+2. اذكر أهم النقاط التي تمت مناقشتها
+3. اذكر أي قرارات أو نتائج تم التوصل إليها
+4. كن موجزاً (لا تتجاوز 3-4 جمل)
+5. استخدم لغة المحادثة (عربي أو إنجليزي)`
+        },
+        {
+          role: 'user',
+          content: `لخص هذه المحادثة:\n\n${conversationText}`
+        }
+      ],
+      max_completion_tokens: 500,
+    });
+
+    const summary = response.choices[0]?.message?.content;
+    if (summary) {
+      return { success: true, summary };
+    }
+    return { success: false, error: 'فشل في إنشاء الملخص' };
+  } catch (error: any) {
+    console.error('Summarization error:', error?.message || error);
+    
+    if (error?.status === 429) {
+      return { success: false, error: 'الخدمة مشغولة، حاول لاحقاً' };
+    }
+    if (error?.status === 401) {
+      return { success: false, error: 'مفتاح API غير صحيح' };
+    }
+    return { success: false, error: error?.message || 'حدث خطأ في التلخيص' };
+  }
+}
+
 export async function generateResponse(userId: string, userMessage: string): Promise<string> {
   if (!settings.autoReply) {
     return '';
