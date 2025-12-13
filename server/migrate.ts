@@ -2,6 +2,11 @@ import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 
 export async function runMigrations() {
+  if (!db) {
+    console.log("Database not available - skipping migrations");
+    return;
+  }
+  
   console.log("Running database migrations...");
   
   try {

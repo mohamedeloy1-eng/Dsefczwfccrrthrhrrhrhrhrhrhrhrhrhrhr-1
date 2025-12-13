@@ -7,6 +7,17 @@ import { conversationStore } from "./conversationStore";
 import { userStore } from "./userStore";
 import { logStore } from "./logStore";
 import type { BotStatus, UserClassification } from "./types";
+import {
+  scheduledMessagesStore,
+  remindersStore,
+  welcomeMessagesStore,
+  replyTemplatesStore,
+  analyticsStore,
+  voiceSettingsStore,
+  integrationsStore,
+  subscriptionTiersStore,
+  userMemoryStore,
+} from "./featureStores";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -920,6 +931,177 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(500).json({ error: error?.message || 'Failed to fetch contacts data' });
     }
+  });
+
+  // ========== Feature Stores APIs ==========
+
+  // Scheduled Messages APIs
+  app.get('/api/scheduled-messages', (req, res) => res.json(scheduledMessagesStore.getAll()));
+  app.post('/api/scheduled-messages', (req, res) => {
+    const { phoneNumber, message, scheduledAt, sessionId, repeatType } = req.body;
+    if (!phoneNumber || !message || !scheduledAt) {
+      return res.status(400).json({ error: 'phoneNumber, message, and scheduledAt are required' });
+    }
+    const date = new Date(scheduledAt);
+    if (isNaN(date.getTime())) {
+      return res.status(400).json({ error: 'Invalid scheduledAt date' });
+    }
+    const msg = scheduledMessagesStore.create({ phoneNumber, message, scheduledAt: date, sessionId, repeatType });
+    res.json(msg);
+  });
+  app.post('/api/scheduled-messages/:id/cancel', (req, res) => {
+    const success = scheduledMessagesStore.cancel(req.params.id);
+    res.json({ success });
+  });
+  app.delete('/api/scheduled-messages/:id', (req, res) => {
+    const success = scheduledMessagesStore.delete(req.params.id);
+    res.json({ success });
+  });
+
+  // Reminders APIs
+  app.get('/api/reminders', (req, res) => res.json(remindersStore.getAll()));
+  app.post('/api/reminders', (req, res) => {
+    const { phoneNumber, title, description, remindAt, sessionId } = req.body;
+    if (!phoneNumber || !title || !remindAt) {
+      return res.status(400).json({ error: 'phoneNumber, title, and remindAt are required' });
+    }
+    const date = new Date(remindAt);
+    if (isNaN(date.getTime())) {
+      return res.status(400).json({ error: 'Invalid remindAt date' });
+    }
+    const reminder = remindersStore.create({ phoneNumber, title, description, remindAt: date, sessionId });
+    res.json(reminder);
+  });
+  app.post('/api/reminders/:id/cancel', (req, res) => {
+    const success = remindersStore.cancel(req.params.id);
+    res.json({ success });
+  });
+  app.delete('/api/reminders/:id', (req, res) => {
+    const success = remindersStore.delete(req.params.id);
+    res.json({ success });
+  });
+
+  // Welcome Messages APIs
+  app.get('/api/welcome-messages', (req, res) => res.json(welcomeMessagesStore.getAll()));
+  app.post('/api/welcome-messages', (req, res) => {
+    const { message, isEnabled, sessionId } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'message is required' });
+    }
+    const msg = welcomeMessagesStore.create({ message, isEnabled: isEnabled ?? true, sessionId });
+    res.json(msg);
+  });
+  app.put('/api/welcome-messages/:id', (req, res) => {
+    const updated = welcomeMessagesStore.update(req.params.id, req.body);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: 'Not found' });
+  });
+  app.delete('/api/welcome-messages/:id', (req, res) => {
+    const success = welcomeMessagesStore.delete(req.params.id);
+    res.json({ success });
+  });
+
+  // Reply Templates APIs
+  app.get('/api/reply-templates', (req, res) => res.json(replyTemplatesStore.getAll()));
+  app.post('/api/reply-templates', (req, res) => {
+    const { title, content, category, shortcut, isActive, buttons } = req.body;
+    if (!title || !content) {
+      return res.status(400).json({ error: 'title and content are required' });
+    }
+    const template = replyTemplatesStore.create({ 
+      title, 
+      content, 
+      category: category || 'general', 
+      shortcut, 
+      isActive: isActive ?? true, 
+      buttons 
+    });
+    res.json(template);
+  });
+  app.put('/api/reply-templates/:id', (req, res) => {
+    const updated = replyTemplatesStore.update(req.params.id, req.body);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: 'Not found' });
+  });
+  app.delete('/api/reply-templates/:id', (req, res) => {
+    const success = replyTemplatesStore.delete(req.params.id);
+    res.json({ success });
+  });
+  app.post('/api/reply-templates/:id/button', (req, res) => {
+    const button = replyTemplatesStore.addButton(req.params.id, req.body);
+    res.json(button);
+  });
+
+  // Analytics APIs
+  app.get('/api/analytics/current', (req, res) => res.json(analyticsStore.getCurrentStats()));
+  app.get('/api/analytics/snapshots', (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 30;
+    res.json(analyticsStore.getSnapshots(limit));
+  });
+  app.post('/api/analytics/snapshot', (req, res) => {
+    const totalUsers = userStore.getAllUsers().length;
+    const scheduledMessages = scheduledMessagesStore.getAll().filter(m => m.status === 'pending').length;
+    const snapshot = analyticsStore.createSnapshot(totalUsers, scheduledMessages);
+    res.json(snapshot);
+  });
+
+  // Voice Settings APIs
+  app.get('/api/voice-settings', (req, res) => res.json(voiceSettingsStore.get()));
+  app.put('/api/voice-settings', (req, res) => {
+    const settings = voiceSettingsStore.update(req.body);
+    res.json(settings);
+  });
+
+  // Integrations APIs
+  app.get('/api/integrations', (req, res) => res.json(integrationsStore.getAll()));
+  app.put('/api/integrations/:name', (req, res) => {
+    const updated = integrationsStore.update(req.params.name, req.body);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: 'Not found' });
+  });
+  app.post('/api/integrations/:name/enable', (req, res) => {
+    const success = integrationsStore.enable(req.params.name);
+    res.json({ success });
+  });
+  app.post('/api/integrations/:name/disable', (req, res) => {
+    const success = integrationsStore.disable(req.params.name);
+    res.json({ success });
+  });
+
+  // Subscription Tiers APIs
+  app.get('/api/subscription-tiers', (req, res) => res.json(subscriptionTiersStore.getAll()));
+  app.put('/api/subscription-tiers/:tier', (req, res) => {
+    const updated = subscriptionTiersStore.update(req.params.tier, req.body);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: 'Not found' });
+  });
+
+  // User Memory APIs
+  app.get('/api/user-memory/:phoneNumber', (req, res) => {
+    const memories = userMemoryStore.getAll(req.params.phoneNumber);
+    res.json(memories);
+  });
+  app.post('/api/user-memory/:phoneNumber', (req, res) => {
+    const { key, value, category } = req.body;
+    if (!key || value === undefined) {
+      return res.status(400).json({ error: 'key and value are required' });
+    }
+    const memory = userMemoryStore.set(req.params.phoneNumber, key, value, category || 'general');
+    res.json(memory);
+  });
+  app.delete('/api/user-memory/:phoneNumber/:key', (req, res) => {
+    const success = userMemoryStore.delete(req.params.phoneNumber, req.params.key);
+    res.json({ success });
+  });
+
+  // Connect message handlers for scheduled messages and reminders
+  scheduledMessagesStore.setMessageHandler(async (phoneNumber, message, sessionId) => {
+    return await whatsappService.sendMessage(phoneNumber, message, sessionId);
+  });
+
+  remindersStore.setReminderHandler(async (phoneNumber, title, description, sessionId) => {
+    const msg = `⏰ تذكير: ${title}${description ? '\n' + description : ''}`;
+    await whatsappService.sendMessage(phoneNumber + '@c.us', msg, sessionId);
   });
 
   return httpServer;
