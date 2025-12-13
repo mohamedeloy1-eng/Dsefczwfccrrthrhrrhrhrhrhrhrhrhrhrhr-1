@@ -1,3 +1,2 @@
-2025/12/13-10:07:30.987 749 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/Service Worker/Database/MANIFEST-000001
-2025/12/13-10:07:31.077 749 Recovering log #3
-2025/12/13-10:07:31.077 749 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/Service Worker/Database/000003.log 
+2025/12/13-16:04:31.321 137 Creating DB /home/runner/workspace/.wwebjs_auth/session-default/Default/Service Worker/Database since it was missing.
+2025/12/13-16:04:31.514 137 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/Service Worker/Database/MANIFEST-000001
