@@ -8,6 +8,7 @@ import express, {
 } from "express";
 
 import { registerRoutes } from "./routes";
+import { runMigrations } from "./migrate";
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -67,6 +68,12 @@ app.use((req, res, next) => {
 export default async function runApp(
   setup: (app: Express, server: Server) => Promise<void>,
 ) {
+  try {
+    await runMigrations();
+  } catch (error) {
+    console.error("Failed to run migrations:", error);
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
