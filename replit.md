@@ -99,6 +99,55 @@ GX-MODY is an intelligent WhatsApp bot powered by OpenAI's GPT model. It automat
 - `GET /api/settings` - Get bot settings
 - `POST /api/settings` - Update bot settings (botName, systemPrompt, autoReply)
 
+### Scheduled Messages
+- `GET /api/scheduled-messages` - Get all scheduled messages
+- `POST /api/scheduled-messages` - Create scheduled message (phoneNumber, message, scheduledAt, repeatType)
+- `POST /api/scheduled-messages/:id/cancel` - Cancel scheduled message
+- `DELETE /api/scheduled-messages/:id` - Delete scheduled message
+
+### Reminders
+- `GET /api/reminders` - Get all reminders
+- `POST /api/reminders` - Create reminder (phoneNumber, title, description, remindAt)
+- `POST /api/reminders/:id/cancel` - Cancel reminder
+- `DELETE /api/reminders/:id` - Delete reminder
+
+### Welcome Messages
+- `GET /api/welcome-messages` - Get all welcome messages
+- `POST /api/welcome-messages` - Create welcome message
+- `PUT /api/welcome-messages/:id` - Update welcome message
+- `DELETE /api/welcome-messages/:id` - Delete welcome message
+
+### Reply Templates
+- `GET /api/reply-templates` - Get all reply templates
+- `POST /api/reply-templates` - Create reply template (title, content, category)
+- `PUT /api/reply-templates/:id` - Update reply template
+- `DELETE /api/reply-templates/:id` - Delete reply template
+- `POST /api/reply-templates/:id/button` - Add interactive button
+
+### Analytics
+- `GET /api/analytics/current` - Get current day statistics
+- `GET /api/analytics/snapshots` - Get historical snapshots
+- `POST /api/analytics/snapshot` - Create analytics snapshot
+
+### Voice Settings
+- `GET /api/voice-settings` - Get voice settings
+- `PUT /api/voice-settings` - Update voice settings (isEnabled, ttsVoice, sttEnabled)
+
+### Integrations
+- `GET /api/integrations` - Get all integrations (Google, Notion, Stripe)
+- `PUT /api/integrations/:name` - Update integration config
+- `POST /api/integrations/:name/enable` - Enable integration
+- `POST /api/integrations/:name/disable` - Disable integration
+
+### Subscription Tiers
+- `GET /api/subscription-tiers` - Get all subscription tiers
+- `PUT /api/subscription-tiers/:tier` - Update tier settings
+
+### User Memory
+- `GET /api/user-memory/:phoneNumber` - Get user memories
+- `POST /api/user-memory/:phoneNumber` - Save user memory (key, value, category)
+- `DELETE /api/user-memory/:phoneNumber/:key` - Delete user memory
+
 ## Environment Variables
 - `OPENAI_API_KEY` - OpenAI API key for AI responses (required)
 
