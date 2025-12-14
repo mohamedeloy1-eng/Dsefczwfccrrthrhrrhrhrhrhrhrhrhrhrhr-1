@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw, Smartphone, CheckCircle2, Wrench, Phone, QrCode, Loader2, Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface QRCodeDisplayProps {
   qrCode: string | null;
@@ -34,16 +34,34 @@ export default function QRCodeDisplay({
   const [pairingError, setPairingError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleRefresh = () => {
+  useEffect(() => {
+    if (!isRefreshing && localRefreshing) {
+      setLocalRefreshing(false);
+    }
+  }, [isRefreshing, localRefreshing]);
+
+  useEffect(() => {
+    if (!isRepairing && localRepairing) {
+      setLocalRepairing(false);
+    }
+  }, [isRepairing, localRepairing]);
+
+  const handleRefresh = async () => {
     setLocalRefreshing(true);
-    onRefresh();
-    setTimeout(() => setLocalRefreshing(false), 1500);
+    try {
+      await Promise.resolve(onRefresh());
+    } finally {
+      setTimeout(() => setLocalRefreshing(false), 2000);
+    }
   };
 
-  const handleRepair = () => {
+  const handleRepair = async () => {
     setLocalRepairing(true);
-    onRepair();
-    setTimeout(() => setLocalRepairing(false), 3000);
+    try {
+      await Promise.resolve(onRepair());
+    } finally {
+      setTimeout(() => setLocalRepairing(false), 3000);
+    }
   };
 
   const handleRequestPairingCode = async () => {
