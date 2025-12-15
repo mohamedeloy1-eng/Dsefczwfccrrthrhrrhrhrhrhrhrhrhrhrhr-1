@@ -4,14 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Settings, Save, Key, MessageSquareText, Image, Trash2, Upload } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Settings, Save, Key, MessageSquareText, Image, Trash2, Upload, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 interface SettingsPanelProps {
   botName: string;
   systemPrompt: string;
   autoReply: boolean;
   onSave: (settings: { botName: string; systemPrompt: string; autoReply: boolean }) => void;
+}
+
+interface AIStatus {
+  configured: boolean;
+  message: string;
+  messageEn: string;
 }
 
 export default function SettingsPanel({ botName: initialName, systemPrompt: initialPrompt, autoReply: initialAutoReply, onSave }: SettingsPanelProps) {
@@ -21,6 +29,10 @@ export default function SettingsPanel({ botName: initialName, systemPrompt: init
   const [isSaving, setIsSaving] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: aiStatus, isLoading: aiStatusLoading } = useQuery<AIStatus>({
+    queryKey: ['/api/ai/status'],
+  });
 
   useEffect(() => {
     const savedBg = localStorage.getItem('app-background');
@@ -86,6 +98,29 @@ export default function SettingsPanel({ botName: initialName, systemPrompt: init
           <CardDescription>Configure your GX-MODY bot behavior</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {aiStatusLoading ? (
+            <Alert className="border-blue-500/50 bg-blue-500/10" data-testid="alert-api-loading">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+              <AlertDescription className="text-blue-600 dark:text-blue-400">
+                جاري التحقق من حالة API...
+              </AlertDescription>
+            </Alert>
+          ) : aiStatus?.configured ? (
+            <Alert className="border-green-500/50 bg-green-500/10" data-testid="alert-api-configured">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <AlertDescription className="text-green-600 dark:text-green-400">
+                {aiStatus.message}
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert className="border-red-500/50 bg-red-500/10" data-testid="alert-api-not-configured">
+              <AlertCircle className="h-4 w-4 text-red-500" />
+              <AlertDescription className="text-red-600 dark:text-red-400">
+                {aiStatus?.message || 'مفتاح OpenAI API غير مضاف'}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="botName" className="flex items-center gap-2">
               <Key className="h-4 w-4" />

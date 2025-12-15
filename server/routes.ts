@@ -547,6 +547,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(updated);
   });
 
+  app.get('/api/ai/status', (req, res) => {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      res.json({ 
+        configured: false, 
+        message: 'مفتاح OpenAI API غير مضاف. يرجى إضافته في الإعدادات السرية.',
+        messageEn: 'OpenAI API key is not configured. Please add it in Secrets.'
+      });
+    } else if (apiKey.length < 20) {
+      res.json({ 
+        configured: false, 
+        message: 'مفتاح OpenAI API غير صالح. يرجى التحقق منه.',
+        messageEn: 'OpenAI API key appears invalid. Please check it.'
+      });
+    } else {
+      res.json({ 
+        configured: true, 
+        message: 'مفتاح OpenAI API مضاف ويعمل بشكل صحيح.',
+        messageEn: 'OpenAI API key is configured and working.'
+      });
+    }
+  });
+
   // AI APIs
   app.post('/api/ai/chat', async (req, res) => {
     try {
