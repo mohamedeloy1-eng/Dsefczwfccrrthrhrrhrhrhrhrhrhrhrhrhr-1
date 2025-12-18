@@ -1,0 +1,37 @@
+2025/12/18-01:03:19.092 ccf Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/18-01:03:19.094 ccf Recovering log #91
+2025/12/18-01:03:19.114 ccf Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000091.log 
+2025/12/18-01:03:21.539 cd5 Level-0 table #97: started
+2025/12/18-01:03:21.676 cd5 Level-0 table #97: 414930 bytes OK
+2025/12/18-01:03:21.706 cd5 Delete type=0 #91
+2025/12/18-01:03:21.708 cd5 Manual compaction at level-0 from '\x00%\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00&\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/18-01:03:21.870 e3d Compacting 1@1 + 2@2 files
+2025/12/18-01:03:22.027 e3d Generated table #98@1: 42339 keys, 2192248 bytes
+2025/12/18-01:03:22.139 e3d Generated table #99@1: 24450 keys, 1090029 bytes
+2025/12/18-01:03:22.139 e3d Compacted 1@1 + 2@2 files => 3282277 bytes
+2025/12/18-01:03:22.146 e3d compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/12/18-01:03:22.151 e3d Delete type=2 #93
+2025/12/18-01:03:22.151 e3d Delete type=2 #94
+2025/12/18-01:03:22.151 e3d Delete type=2 #97
+2025/12/18-01:03:32.799 cd1 Level-0 table #101: started
+2025/12/18-01:03:32.982 cd1 Level-0 table #101: 1123152 bytes OK
+2025/12/18-01:03:33.008 cd1 Delete type=0 #96
+2025/12/18-01:03:33.011 cd1 Compacting 1@1 + 2@2 files
+2025/12/18-01:03:33.162 cd1 Generated table #102@1: 45150 keys, 2187397 bytes
+2025/12/18-01:03:33.293 cd1 Generated table #103@1: 34502 keys, 1656470 bytes
+2025/12/18-01:03:33.293 cd1 Compacted 1@1 + 2@2 files => 3843867 bytes
+2025/12/18-01:03:33.297 cd1 compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/12/18-01:03:33.297 cd1 Delete type=2 #98
+2025/12/18-01:03:33.297 cd1 Delete type=2 #99
+2025/12/18-01:03:33.297 cd1 Delete type=2 #101
+2025/12/18-01:03:33.634 cd6 Level-0 table #105: started
+2025/12/18-01:03:33.705 cd6 Level-0 table #105: 1209710 bytes OK
+2025/12/18-01:03:33.711 cd6 Delete type=0 #100
+2025/12/18-01:03:34.030 cd1 Compacting 1@1 + 2@2 files
+2025/12/18-01:03:34.128 cd1 Generated table #106@1: 42840 keys, 2194135 bytes
+2025/12/18-01:03:34.179 cd1 Generated table #107@1: 28153 keys, 1298221 bytes
+2025/12/18-01:03:34.180 cd1 Compacted 1@1 + 2@2 files => 3492356 bytes
+2025/12/18-01:03:34.183 cd1 compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/12/18-01:03:34.184 cd1 Delete type=2 #102
+2025/12/18-01:03:34.184 cd1 Delete type=2 #103
+2025/12/18-01:03:34.184 cd1 Delete type=2 #105
