@@ -86,41 +86,76 @@ export function clearAllConversations(): void {
 
 export async function webSearch(query: string): Promise<{ success: boolean; result?: string; error?: string }> {
   try {
-    const openai = getOpenAIClient();
-    
-    // gpt-5 doesn't support temperature parameter
-    const response = await openai.chat.completions.create({
-      model: AI_MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: `أنت مساعد بحث ذكي للغاية. عند تلقي استعلام بحث:
-1. فكّر في السؤال بعمق وحلله
-2. قدم إجابة شاملة ومفيدة ومنظمة
-3. استخدم العناوين والنقاط لتنظيم المعلومات
-4. إذا كان السؤال يتعلق بأحداث حديثة جداً قد لا تعرفها، أوضح ذلك بلطف
-5. اكتب بلغة المستخدم (عربي أو إنجليزي)`
-        },
-        {
-          role: 'user',
-          content: `ابحث وأجب عن: ${query}`
-        }
-      ],
-      max_completion_tokens: 4096,
+    const serperKey = process.env.SERPER_API_KEY;
+    if (!serperKey) {
+      return { success: false, error: 'خدمة البحث غير مُعدة' };
+    }
+
+    // Use Serper API for search results
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': serperKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: query,
+        num: 10,
+        gl: 'eg',
+        hl: 'ar'
+      }),
     });
 
-    const result = response.choices[0]?.message?.content;
-    if (result) {
-      return { success: true, result };
+    if (!response.ok) {
+      throw new Error(`Serper API error: ${response.status}`);
     }
-    return { success: false, error: 'لم يتم العثور على نتائج' };
+
+    const data = await response.json() as any;
+    
+    if (!data.organic || data.organic.length === 0) {
+      return { success: false, error: 'لم يتم العثور على نتائج للبحث' };
+    }
+
+    // Format search results
+    const searchResults = data.organic.slice(0, 5).map((result: any) => 
+      `📌 **${result.title}**\n${result.snippet}\n🔗 ${result.link}`
+    ).join('\n\n');
+
+    // Use OpenAI to enhance and summarize results
+    try {
+      const openai = getOpenAIClient();
+      const enhancement = await openai.chat.completions.create({
+        model: AI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: `أنت مساعد ذكي متخصص في تحسين نتائج البحث. قم بتحسين النتائج التالية:
+1. انسخ النتائج الأساسية
+2. أضف ملخص سريع (جملتان) في البداية
+3. رتب النتائج حسب الأهمية
+4. اكتب بلغة المستخدم (عربي أو إنجليزي)`
+          },
+          {
+            role: 'user',
+            content: `السؤال: ${query}\n\nنتائج البحث:\n${searchResults}`
+          }
+        ],
+        max_completion_tokens: 2048,
+      });
+
+      const enhancedResult = enhancement.choices[0]?.message?.content;
+      if (enhancedResult) {
+        return { success: true, result: enhancedResult };
+      }
+    } catch (enhanceError) {
+      // If enhancement fails, return raw search results
+      console.error('Enhancement error:', enhanceError);
+    }
+
+    return { success: true, result: searchResults };
   } catch (error: any) {
     console.error('Web search error:', error?.message || error);
-    
-    if (error?.status === 429) {
-      return { success: false, error: 'الخدمة مشغولة، حاول لاحقاً' };
-    }
-    return { success: false, error: error?.message || 'حدث خطأ في البحث' };
+    return { success: false, error: 'حدث خطأ في البحث. حاول لاحقاً' };
   }
 }
 

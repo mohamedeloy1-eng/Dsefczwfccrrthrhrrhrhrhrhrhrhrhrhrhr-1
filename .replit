@@ -45,6 +45,7 @@ integrations = ["javascript_openai:1.0.0"]
 [userenv]
 
 [userenv.shared]
+SERPER_API_KEY = "3d6642cf42779d3289e1f3199988753fa243c9ff"
 
 [userenv.development]
 
