@@ -18,6 +18,12 @@ import {
   subscriptionTiersStore,
   userMemoryStore,
 } from "./featureStores";
+import { 
+  downloadYouTubeAudio, 
+  downloadYouTubeVideo, 
+  extractYouTubeUrl, 
+  cleanupFile 
+} from "./mediaDownloader";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -188,6 +194,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
         /^ابحث[:\s]+(.+)/i,
         /^ابحث عن[:\s]+(.+)/i,
       ];
+
+      const downloadPatterns = [
+        /^حمل[:\s]+(.+)/i,
+        /^download[:\s]+(.+)/i,
+        /^تحميل[:\s]+(.+)/i,
+        /^صوت[:\s]+(.+)/i,
+        /^audio[:\s]+(.+)/i,
+        /^فيديو[:\s]+(.+)/i,
+        /^video[:\s]+(.+)/i,
+      ];
+      
+      let downloadQuery: string | null = null;
+      let downloadType: 'audio' | 'video' = 'audio';
+      let matchedPatternIndex = -1;
+      
+      for (let i = 0; i < downloadPatterns.length; i++) {
+        const match = message.body.match(downloadPatterns[i]);
+        if (match) {
+          downloadQuery = match[1].trim();
+          matchedPatternIndex = i;
+          if (i >= 4) {
+            downloadType = 'video';
+          }
+          break;
+        }
+      }
+      
+      if (downloadQuery) {
+        const youtubeUrl = extractYouTubeUrl(downloadQuery);
+        
+        if (youtubeUrl) {
+          const statusMsg = downloadType === 'video' ? '⏳ جاري تحميل الفيديو...' : '⏳ جاري تحميل الصوت...';
+          const timestamp = Math.floor(Date.now() / 1000);
+          conversationStore.addMessage(message.from, statusMsg, true, timestamp, sessionId);
+          broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+          
+          try {
+            const downloadResult = downloadType === 'video' 
+              ? await downloadYouTubeVideo(youtubeUrl)
+              : await downloadYouTubeAudio(youtubeUrl);
+            
+            if (downloadResult.success && downloadResult.filePath && downloadResult.fileName) {
+              const sent = downloadType === 'video'
+                ? await whatsappService.sendVideoFile(message.from, downloadResult.filePath, downloadResult.fileName, sessionId)
+                : await whatsappService.sendAudioFile(message.from, downloadResult.filePath, downloadResult.fileName, sessionId);
+              
+              if (sent) {
+                const successMsg = downloadType === 'video' ? '✅ تم إرسال الفيديو بنجاح!' : '✅ تم إرسال الصوت بنجاح!';
+                conversationStore.addMessage(message.from, successMsg, true, timestamp, sessionId);
+                
+                logStore.logOutgoingMessage(
+                  message.from,
+                  sessionId,
+                  successMsg,
+                  'text',
+                  'success'
+                );
+                
+                whatsappService.incrementBotReplies(sessionId);
+                broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+                
+                cleanupFile(downloadResult.filePath);
+                return null;
+              } else {
+                const errorMsg = `❌ فشل في إرسال ${downloadType === 'video' ? 'الفيديو' : 'الصوت'}. حاول مرة أخرى.`;
+                conversationStore.addMessage(message.from, errorMsg, true, timestamp, sessionId);
+                userStore.recordError(message.from, errorMsg, sessionId);
+                logStore.logError(message.from, sessionId, errorMsg);
+                broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+                cleanupFile(downloadResult.filePath);
+                return errorMsg;
+              }
+            } else {
+              const errorMsg = downloadResult.error || `❌ فشل في تحميل ${downloadType === 'video' ? 'الفيديو' : 'الصوت'}. حاول مرة أخرى.`;
+              conversationStore.addMessage(message.from, errorMsg, true, timestamp, sessionId);
+              userStore.recordError(message.from, errorMsg, sessionId);
+              logStore.logError(message.from, sessionId, errorMsg);
+              broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+              return errorMsg;
+            }
+          } catch (err: any) {
+            console.error('Download error:', err);
+            const errorMsg = `❌ خطأ في التحميل: ${err?.message || 'حاول مرة أخرى'}`;
+            const timestamp = Math.floor(Date.now() / 1000);
+            conversationStore.addMessage(message.from, errorMsg, true, timestamp, sessionId);
+            const errorResult = userStore.recordError(message.from, err?.message || errorMsg, sessionId);
+            logStore.logError(message.from, sessionId, err?.message || 'Download error');
+            
+            if (errorResult.shouldBlock) {
+              broadcast({ type: 'security', data: { 
+                type: 'auto_blocked', 
+                phoneNumber: message.from, 
+                reason: 'Repeated errors' 
+              }});
+            }
+            
+            broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+            return errorMsg;
+          }
+        } else {
+          const errorMsg = '❌ أرسل رابط يوتيوب صحيح. مثال:\nحمل: https://youtube.com/watch?v=xxxxx';
+          const timestamp = Math.floor(Date.now() / 1000);
+          conversationStore.addMessage(message.from, errorMsg, true, timestamp, sessionId);
+          broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+          return errorMsg;
+        }
+      }
       
       let searchQuery: string | null = null;
       for (const pattern of searchPatterns) {

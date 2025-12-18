@@ -11,7 +11,8 @@ GX-MODY is an intelligent WhatsApp bot powered by OpenAI's GPT model. It automat
 - **conversationStore.ts** - In-memory storage for conversation history and statistics
 - **userStore.ts** - User management with rate limiting, blocking, and classifications
 - **logStore.ts** - Complete message logging system with timestamps and session IDs
-- **routes.ts** - REST API endpoints + WebSocket for real-time updates
+- **mediaDownloader.ts** - YouTube media downloading service for extracting audio and video with FFmpeg conversion
+- **routes.ts** - REST API endpoints + WebSocket for real-time updates, includes media download command handler
 - **types.ts** - TypeScript type definitions
 
 ### Frontend (client/)
