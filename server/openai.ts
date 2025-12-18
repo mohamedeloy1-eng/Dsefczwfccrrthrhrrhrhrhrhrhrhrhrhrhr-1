@@ -84,14 +84,23 @@ export function clearAllConversations(): void {
   conversationHistory.clear();
 }
 
-export async function webSearch(query: string): Promise<{ success: boolean; result?: string; error?: string }> {
+interface SearchResult {
+  title: string;
+  snippet: string;
+  link: string;
+  image?: string;
+  source?: string;
+  relevance: number;
+}
+
+export async function webSearch(query: string): Promise<{ success: boolean; result?: string; results?: SearchResult[]; error?: string }> {
   try {
     const serperKey = process.env.SERPER_API_KEY;
     if (!serperKey) {
       return { success: false, error: 'خدمة البحث غير مُعدة' };
     }
 
-    // Use Serper API for search results
+    // Use Serper API for advanced search
     const response = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: {
@@ -102,7 +111,9 @@ export async function webSearch(query: string): Promise<{ success: boolean; resu
         q: query,
         num: 10,
         gl: 'eg',
-        hl: 'ar'
+        hl: 'ar',
+        autocorrect: true,
+        page: 0
       }),
     });
 
@@ -116,12 +127,28 @@ export async function webSearch(query: string): Promise<{ success: boolean; resu
       return { success: false, error: 'لم يتم العثور على نتائج للبحث' };
     }
 
-    // Format search results
-    const searchResults = data.organic.slice(0, 5).map((result: any) => 
-      `📌 **${result.title}**\n${result.snippet}\n🔗 ${result.link}`
-    ).join('\n\n');
+    // Process and enhance search results with scoring
+    const processedResults: SearchResult[] = data.organic.slice(0, 5).map((result: any, index: number) => {
+      // Calculate relevance score (lower index = higher relevance)
+      const relevance = 100 - (index * 15);
+      
+      return {
+        title: result.title || 'بدون عنوان',
+        snippet: result.snippet || result.description || 'بدون وصف',
+        link: result.link || '',
+        image: result.image || data.answerBox?.image || '',
+        source: new URL(result.link).hostname.replace('www.', '') || 'مصدر',
+        relevance: Math.max(40, relevance)
+      };
+    });
 
-    // Use OpenAI to enhance and summarize results
+    // Format for WhatsApp display with better structure
+    const formattedResults = processedResults.map((r, idx) => {
+      const emoji = ['🥇', '🥈', '🥉', '📌', '📍'][idx] || '📌';
+      return `${emoji} *${r.title}*\n${r.snippet}\n🔗 ${r.link}\n📧 ${r.source}`;
+    }).join('\n\n' + '─'.repeat(30) + '\n\n');
+
+    // Use OpenAI to create smart summary and insights
     try {
       const openai = getOpenAIClient();
       const enhancement = await openai.chat.completions.create({
@@ -129,33 +156,33 @@ export async function webSearch(query: string): Promise<{ success: boolean; resu
         messages: [
           {
             role: 'system',
-            content: `أنت مساعد ذكي متخصص في تحسين نتائج البحث. قم بتحسين النتائج التالية:
-1. انسخ النتائج الأساسية
-2. أضف ملخص سريع (جملتان) في البداية
-3. رتب النتائج حسب الأهمية
-4. اكتب بلغة المستخدم (عربي أو إنجليزي)`
+            content: `أنت خبير في تحليل وتلخيص نتائج البحث. عند تلقي نتائج بحث:
+1. اكتب ملخصاً ذكياً (جملتان) يجيب على السؤال مباشرة
+2. ركز على المعلومات الأكثر أهمية والصلة
+3. استخدم لغة واضحة وموجزة
+4. لا تذكر أسماء المواقع في الملخص
+5. اكتب بلغة المستخدم (عربي أو إنجليزي)`
           },
           {
             role: 'user',
-            content: `السؤال: ${query}\n\nنتائج البحث:\n${searchResults}`
+            content: `السؤال: ${query}\n\nنتائج البحث:\n${formattedResults}`
           }
         ],
-        max_completion_tokens: 2048,
+        max_completion_tokens: 1024,
       });
 
-      const enhancedResult = enhancement.choices[0]?.message?.content;
-      if (enhancedResult) {
-        return { success: true, result: enhancedResult };
-      }
+      const summary = enhancement.choices[0]?.message?.content || '';
+      const finalResult = `🔍 *نتائج البحث عن: "${query}"*\n\n${summary}\n\n*النتائج التفصيلية:*\n\n${formattedResults}`;
+      
+      return { success: true, result: finalResult, results: processedResults };
     } catch (enhanceError) {
-      // If enhancement fails, return raw search results
       console.error('Enhancement error:', enhanceError);
+      const fallbackResult = `🔍 *نتائج البحث عن: "${query}"*\n\n${formattedResults}`;
+      return { success: true, result: fallbackResult, results: processedResults };
     }
-
-    return { success: true, result: searchResults };
   } catch (error: any) {
     console.error('Web search error:', error?.message || error);
-    return { success: false, error: 'حدث خطأ في البحث. حاول لاحقاً' };
+    return { success: false, error: 'حدث خطأ في البحث. تأكد من اتصالك بالإنترنت وحاول مرة أخرى' };
   }
 }
 
