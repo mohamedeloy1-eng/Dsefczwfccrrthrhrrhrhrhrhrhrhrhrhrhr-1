@@ -41,3 +41,13 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_openai:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+
+[userenv.development]
+open_api_key = "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"
+
+[userenv.production]
+open_api_key = "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"

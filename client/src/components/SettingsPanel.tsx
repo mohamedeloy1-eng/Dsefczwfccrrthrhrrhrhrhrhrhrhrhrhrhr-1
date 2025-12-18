@@ -5,9 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Save, Key, MessageSquareText, Image, Trash2, Upload, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Settings, Save, Key, MessageSquareText, Image, Trash2, Upload, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface SettingsPanelProps {
   botName: string;
@@ -28,10 +29,34 @@ export default function SettingsPanel({ botName: initialName, systemPrompt: init
   const [autoReply, setAutoReply] = useState(initialAutoReply);
   const [isSaving, setIsSaving] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyMessage, setApiKeyMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: aiStatus, isLoading: aiStatusLoading } = useQuery<AIStatus>({
     queryKey: ['/api/ai/status'],
+  });
+
+  const updateApiKeyMutation = useMutation({
+    mutationFn: async (key: string) => {
+      const response = await fetch('/api/settings/api-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: key })
+      });
+      if (!response.ok) throw new Error('Failed to save API key');
+      return response.json();
+    },
+    onSuccess: () => {
+      setApiKeyMessage('تم حفظ المفتاح بنجاح!');
+      setApiKey('');
+      setTimeout(() => setApiKeyMessage(''), 3000);
+    },
+    onError: () => {
+      setApiKeyMessage('حدث خطأ في حفظ المفتاح');
+      setTimeout(() => setApiKeyMessage(''), 3000);
+    },
   });
 
   useEffect(() => {
@@ -166,6 +191,48 @@ export default function SettingsPanel({ botName: initialName, systemPrompt: init
               onCheckedChange={setAutoReply}
               data-testid="switch-auto-reply"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="apiKey" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              مفتاح OpenAI API
+            </Label>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Input
+                  id="apiKey"
+                  type={showApiKey ? "text" : "password"}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="sk-..."
+                  data-testid="input-api-key"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  data-testid="button-toggle-api-key"
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <Button
+                onClick={() => updateApiKeyMutation.mutate(apiKey)}
+                disabled={!apiKey || updateApiKeyMutation.isPending}
+                data-testid="button-save-api-key"
+              >
+                {updateApiKeyMutation.isPending ? 'جاري...' : 'حفظ'}
+              </Button>
+            </div>
+            {apiKeyMessage && (
+              <p className={`text-xs ${apiKeyMessage.includes('نجاح') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {apiKeyMessage}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              احصل على مفتاح من <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">platform.openai.com</a>
+            </p>
           </div>
 
           <Button 

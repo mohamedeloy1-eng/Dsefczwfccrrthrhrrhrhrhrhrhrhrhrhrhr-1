@@ -660,6 +660,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(updated);
   });
 
+  app.post('/api/settings/api-key', async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      if (!apiKey || apiKey.trim().length === 0) {
+        return res.status(400).json({ success: false, error: 'API key is required' });
+      }
+      
+      process.env.OPENAI_API_KEY = apiKey;
+      
+      res.json({ 
+        success: true, 
+        message: 'API key saved successfully',
+        configured: true
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        error: error?.message || 'Failed to save API key' 
+      });
+    }
+  });
+
   app.get('/api/ai/status', (req, res) => {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
