@@ -421,6 +421,46 @@ class WhatsAppSession extends EventEmitter {
     }
   }
 
+  async sendAudioFile(to: string, filePath: string, fileName: string): Promise<boolean> {
+    if (!this.client || !this.status.isReady) {
+      console.error('WhatsApp client not ready');
+      return false;
+    }
+
+    try {
+      const fs = await import('fs');
+      const buffer = fs.readFileSync(filePath);
+      const base64 = buffer.toString('base64');
+      const media = new MessageMedia('audio/mpeg', base64, fileName);
+      
+      await this.client.sendMessage(to, media, { sendAudioAsVoice: false });
+      return true;
+    } catch (err) {
+      console.error('Error sending audio file:', err);
+      return false;
+    }
+  }
+
+  async sendVideoFile(to: string, filePath: string, fileName: string): Promise<boolean> {
+    if (!this.client || !this.status.isReady) {
+      console.error('WhatsApp client not ready');
+      return false;
+    }
+
+    try {
+      const fs = await import('fs');
+      const buffer = fs.readFileSync(filePath);
+      const base64 = buffer.toString('base64');
+      const media = new MessageMedia('video/mp4', base64, fileName);
+      
+      await this.client.sendMessage(to, media);
+      return true;
+    } catch (err) {
+      console.error('Error sending video file:', err);
+      return false;
+    }
+  }
+
   private downloadImageWithMime(url: string): Promise<{ buffer: Buffer; mimeType: string }> {
     return new Promise((resolve, reject) => {
       const protocol = url.startsWith('https') ? https : http;
@@ -1354,6 +1394,24 @@ class WhatsAppService extends EventEmitter {
     const session = this.sessions.get(id);
     if (session) {
       return session.sendImage(to, imageUrl, asSticker);
+    }
+    return false;
+  }
+
+  async sendAudioFile(to: string, filePath: string, fileName: string, sessionId?: string): Promise<boolean> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.sendAudioFile(to, filePath, fileName);
+    }
+    return false;
+  }
+
+  async sendVideoFile(to: string, filePath: string, fileName: string, sessionId?: string): Promise<boolean> {
+    const id = sessionId || this.activeSessionId;
+    const session = this.sessions.get(id);
+    if (session) {
+      return session.sendVideoFile(to, filePath, fileName);
     }
     return false;
   }
