@@ -175,8 +175,13 @@ export async function webSearch(query: string): Promise<{ success: boolean; resu
       const finalResult = `🔍 *نتائج البحث عن: "${query}"*\n\n${summary}\n\n*النتائج التفصيلية:*\n\n${formattedResults}`;
       
       return { success: true, result: finalResult, results: processedResults };
-    } catch (enhanceError) {
+    } catch (enhanceError: any) {
       console.error('Enhancement error:', enhanceError);
+      // If OpenAI quota is exceeded, return results without AI summary
+      if (enhanceError?.status === 429 || enhanceError?.status === 402 || enhanceError?.code === 'insufficient_quota') {
+        const fallbackResult = `🔍 *نتائج البحث عن: "${query}"*\n\n*النتائج:*\n\n${formattedResults}`;
+        return { success: true, result: fallbackResult, results: processedResults };
+      }
       const fallbackResult = `🔍 *نتائج البحث عن: "${query}"*\n\n${formattedResults}`;
       return { success: true, result: fallbackResult, results: processedResults };
     }
@@ -226,10 +231,10 @@ export async function generateImage(prompt: string): Promise<{ success: boolean;
     }
     
     // Billing/quota issues
-    if (errorStatus === 402 || errorCode === 'insufficient_quota') {
+    if (errorStatus === 402 || errorStatus === 429 || errorCode === 'insufficient_quota') {
       return { 
         success: false, 
-        error: '💳 الحصة اليومية للصور انتهت. حاول لاحقاً.',
+        error: '💳 تم تجاوز حد الاستخدام. يرجى مراجعة حسابك على OpenAI وتحديث بيانات الدفع.',
         errorCode: 'quota_exceeded'
       };
     }
@@ -321,8 +326,8 @@ export async function summarizeConversation(messages: { content: string; isBot: 
   } catch (error: any) {
     console.error('Summarization error:', error?.message || error);
     
-    if (error?.status === 429) {
-      return { success: false, error: 'الخدمة مشغولة، حاول لاحقاً' };
+    if (error?.status === 429 || error?.status === 402 || error?.code === 'insufficient_quota') {
+      return { success: false, error: 'تم تجاوز حد الاستخدام، حاول لاحقاً' };
     }
     if (error?.status === 401) {
       return { success: false, error: 'مفتاح API غير صحيح' };
@@ -385,8 +390,13 @@ export async function generateResponse(userId: string, userMessage: string): Pro
       return 'عذراً، مفتاح OpenAI API غير صحيح. يرجى التحقق منه.';
     }
     
-    if (error?.status === 429) {
-      return 'عذراً، الخدمة مشغولة حالياً. يرجى المحاولة لاحقاً.';
+    // Handle quota/billing errors (429 or 402)
+    if (error?.status === 429 || error?.status === 402 || error?.code === 'insufficient_quota') {
+      return 'عذراً، تم تجاوز حد الاستخدام. يرجى مراجعة حسابك على OpenAI وتحديث بيانات الدفع أو ترقية الخطة.';
+    }
+    
+    if (error?.status === 500 || error?.status >= 503) {
+      return 'عذراً، الخدمة غير متاحة حالياً. يرجى المحاولة لاحقاً.';
     }
     
     return 'عذراً، حدث خطأ أثناء معالجة رسالتك. يرجى المحاولة مرة أخرى.';
