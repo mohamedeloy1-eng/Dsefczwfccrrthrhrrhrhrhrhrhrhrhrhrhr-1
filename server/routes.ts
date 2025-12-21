@@ -6,6 +6,7 @@ import { generateResponse, generateImage, webSearch, updateSettings, getSettings
 import { conversationStore } from "./conversationStore";
 import { userStore } from "./userStore";
 import { logStore } from "./logStore";
+import { storage } from "./storage";
 import type { BotStatus, UserClassification } from "./types";
 import {
   scheduledMessagesStore,
@@ -150,6 +151,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (whatsappService.isSessionSuspended(sessionId)) {
       console.log('Session is suspended, not responding to message');
       return null;
+    }
+
+    // Support Ticket Command: .دعم
+    if (message.body.startsWith('.دعم ')) {
+      const issue = message.body.slice(5).trim();
+      if (issue) {
+        try {
+          await storage.createSupportTicket({
+            phoneNumber: message.from,
+            issue: issue,
+            status: "open",
+            response: null
+          });
+          const successMsg = "✅ تم استلام تذكرتك بنجاح. سيقوم الدعم الفني بالرد عليك في أقرب وقت ممكن.";
+          const timestamp = Math.floor(Date.now() / 1000);
+          conversationStore.addMessage(message.from, successMsg, true, timestamp, sessionId);
+          broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+          return successMsg;
+        } catch (err) {
+          console.error("Error creating ticket:", err);
+          return "❌ عذراً، فشل في إنشاء التذكرة. حاول مرة أخرى.";
+        }
+      }
     }
 
     const user = userStore.getOrCreateUser(message.from, sessionId);
@@ -594,6 +618,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ? conversationStore.getAllConversations(sessionId)
       : conversationStore.getAllSessionsConversations();
     res.json(conversations);
+  });
+
+  // Support Tickets API
+  app.get('/api/tickets', async (req, res) => {
+    try {
+      const tickets = await storage.getSupportTickets();
+      res.json(tickets);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/tickets/:id/reply', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { response } = req.body;
+      if (!response) return res.status(400).json({ error: "Response is required" });
+
+      const tickets = await storage.getSupportTickets();
+      const ticket = tickets.find(t => t.id === id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      // Send to WhatsApp
+      const sent = await whatsappService.sendMessage(ticket.phoneNumber + '@c.us', `🎫 *رد على تذكرة الدعم:*\n\n${response}\n\nتم إغلاق التذكرة.`);
+      
+      if (sent) {
+        await storage.updateSupportTicket(id, { 
+          response, 
+          status: "closed" 
+        });
+        res.json({ success: true });
+      } else {
+        res.status(500).json({ error: "Failed to send WhatsApp message" });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.get('/api/conversations/:phoneNumber', (req, res) => {

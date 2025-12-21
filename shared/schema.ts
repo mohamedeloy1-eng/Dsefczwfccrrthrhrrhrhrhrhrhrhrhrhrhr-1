@@ -403,6 +403,29 @@ export const insertVoiceSettingSchema = createInsertSchema(voiceSettings).omit({
 export type InsertVoiceSetting = z.infer<typeof insertVoiceSettingSchema>;
 export type VoiceSetting = typeof voiceSettings.$inferSelect;
 
+// ==================== SUPPORT TICKETS ====================
+
+export const ticketStatusEnum = pgEnum("ticket_status", ["open", "closed"]);
+
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  issue: text("issue").notNull(),
+  status: ticketStatusEnum("status").default("open").notNull(),
+  response: text("response"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
 // ==================== RELATIONS ====================
 
 export const whatsappUsersRelations = relations(whatsappUsers, ({ many }) => ({
@@ -410,6 +433,14 @@ export const whatsappUsersRelations = relations(whatsappUsers, ({ many }) => ({
   conversations: many(conversations),
   scheduledMessages: many(scheduledMessages),
   reminders: many(reminders),
+  tickets: many(supportTickets),
+}));
+
+export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
+  user: one(whatsappUsers, {
+    fields: [supportTickets.phoneNumber],
+    references: [whatsappUsers.phoneNumber],
+  }),
 }));
 
 export const userMemoryRelations = relations(userMemory, ({ one }) => ({
