@@ -1,15 +1,15 @@
-2025/12/20-23:57:05.841 87a Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/12/20-23:57:05.841 87a Recovering log #380
-2025/12/20-23:57:05.853 87a Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000380.log 
-2025/12/20-23:57:06.443 87b Level-0 table #386: started
-2025/12/20-23:57:06.468 87b Level-0 table #386: 165736 bytes OK
-2025/12/20-23:57:06.472 87b Delete type=0 #380
-2025/12/20-23:57:06.473 87a Manual compaction at level-0 from '\x00}\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00~\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/12/20-23:57:06.734 87a Compacting 1@1 + 2@2 files
-2025/12/20-23:57:07.088 87a Generated table #387@1: 49224 keys, 2212828 bytes
-2025/12/20-23:57:07.248 87a Generated table #388@1: 28089 keys, 1302209 bytes
-2025/12/20-23:57:07.249 87a Compacted 1@1 + 2@2 files => 3515037 bytes
-2025/12/20-23:57:07.255 87a compacted to: files[ 0 0 2 0 0 0 0 ]
-2025/12/20-23:57:07.255 87a Delete type=2 #382
-2025/12/20-23:57:07.255 87a Delete type=2 #383
-2025/12/20-23:57:07.256 87a Delete type=2 #386
+2025/12/21-00:13:01.401 12dc Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/21-00:13:01.402 12dc Recovering log #395
+2025/12/21-00:13:01.409 12dc Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000395.log 
+2025/12/21-00:13:01.910 12cf Level-0 table #401: started
+2025/12/21-00:13:01.924 12cf Level-0 table #401: 203411 bytes OK
+2025/12/21-00:13:01.938 12cf Delete type=0 #395
+2025/12/21-00:13:01.939 12c6 Manual compaction at level-0 from '\x00\x80\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x81\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/21-00:13:02.104 12c8 Compacting 1@1 + 2@2 files
+2025/12/21-00:13:02.420 12c8 Generated table #402@1: 49408 keys, 2216006 bytes
+2025/12/21-00:13:02.464 12c8 Generated table #403@1: 30376 keys, 1365935 bytes
+2025/12/21-00:13:02.464 12c8 Compacted 1@1 + 2@2 files => 3581941 bytes
+2025/12/21-00:13:02.474 12c8 compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/12/21-00:13:02.474 12c8 Delete type=2 #397
+2025/12/21-00:13:02.475 12c8 Delete type=2 #398
+2025/12/21-00:13:02.475 12c8 Delete type=2 #401

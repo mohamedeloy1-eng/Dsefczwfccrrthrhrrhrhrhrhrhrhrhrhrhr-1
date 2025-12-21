@@ -71,6 +71,7 @@ export default function Broadcast() {
         description: `تم إرسال الرسالة إلى ${result.success} مستخدم${result.failed > 0 ? ` و${result.failed} فشل` : ""}`,
       });
       setMessage("");
+      setIsSending(false);
     },
     onError: (error: any) => {
       toast({
@@ -78,6 +79,7 @@ export default function Broadcast() {
         description: error?.message || "حدث خطأ أثناء الإرسال",
         variant: "destructive",
       });
+      setIsSending(false);
     },
   });
 
@@ -157,9 +159,9 @@ export default function Broadcast() {
 
           {/* Result Info */}
           {lastResult && !isSending && (
-            <Alert className={`border-${lastResult.failed === 0 ? 'green' : 'yellow'}-500/50 bg-${lastResult.failed === 0 ? 'green' : 'yellow'}-500/10`}>
-              <CheckCircle className={`h-4 w-4 text-${lastResult.failed === 0 ? 'green' : 'yellow'}-600 dark:text-${lastResult.failed === 0 ? 'green' : 'yellow'}-400`} />
-              <AlertDescription className={`text-${lastResult.failed === 0 ? 'green' : 'yellow'}-800 dark:text-${lastResult.failed === 0 ? 'green' : 'yellow'}-300`}>
+            <Alert className={lastResult.failed === 0 ? "border-green-500/50 bg-green-500/10" : "border-yellow-500/50 bg-yellow-500/10"}>
+              <CheckCircle className={lastResult.failed === 0 ? "h-4 w-4 text-green-600 dark:text-green-400" : "h-4 w-4 text-yellow-600 dark:text-yellow-400"} />
+              <AlertDescription className={lastResult.failed === 0 ? "text-green-800 dark:text-green-300" : "text-yellow-800 dark:text-yellow-300"}>
                 تم الإرسال: {lastResult.success} نجح
                 {lastResult.failed > 0 && ` و${lastResult.failed} فشل`}
               </AlertDescription>
