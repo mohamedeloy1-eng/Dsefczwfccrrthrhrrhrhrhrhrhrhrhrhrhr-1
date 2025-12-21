@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Moon, Sun, Power, PowerOff, Sparkles, Zap } from "lucide-react";
+import { Bot, Moon, Sun, Power, PowerOff, Sparkles, Zap, Ticket } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 
 interface HeaderProps {
   isConnected: boolean;
@@ -11,6 +12,7 @@ interface HeaderProps {
 export default function Header({ isConnected, onToggleConnection }: HeaderProps) {
   const [isDark, setIsDark] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
+  const [location] = useLocation();
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -38,28 +40,45 @@ export default function Header({ isConnected, onToggleConnection }: HeaderProps)
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all duration-300 dark:bg-card/40 dark:border-primary/10 dark:shadow-[0_4px_30px_rgba(139,92,246,0.1)]" data-testid="header">
       <div className="container flex h-16 items-center justify-between gap-4 px-4">
-        <div 
-          className="flex items-center gap-3 group cursor-pointer"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-          <div className={`relative p-2.5 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-blue-500 shadow-lg transition-all duration-500 ${isHovered ? 'scale-110 shadow-primary/40 shadow-[0_0_25px_rgba(139,92,246,0.5)]' : 'shadow-primary/20'}`}>
-            <Bot className="h-5 w-5 text-primary-foreground transition-transform duration-300 group-hover:rotate-12" />
-            <div className={`absolute -top-1 -right-1 transition-all duration-300 ${isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
-              <Sparkles className="h-3 w-3 text-yellow-400 animate-pulse" />
+        <div className="flex items-center gap-6">
+          <Link href="/">
+            <div 
+              className="flex items-center gap-3 group cursor-pointer"
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+            >
+              <div className={`relative p-2.5 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-blue-500 shadow-lg transition-all duration-500 ${isHovered ? 'scale-110 shadow-primary/40 shadow-[0_0_25px_rgba(139,92,246,0.5)]' : 'shadow-primary/20'}`}>
+                <Bot className="h-5 w-5 text-primary-foreground transition-transform duration-300 group-hover:rotate-12" />
+                <div className={`absolute -top-1 -right-1 transition-all duration-300 ${isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
+                  <Sparkles className="h-3 w-3 text-yellow-400 animate-pulse" />
+                </div>
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-white/20 to-transparent pointer-events-none" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <h1 className="font-bold text-xl bg-gradient-to-r from-primary via-purple-400 to-blue-400 bg-clip-text text-transparent transition-all duration-300">GX-MODY</h1>
+                  <Badge variant="secondary" className="text-xs font-medium px-2 py-0.5 bg-gradient-to-r from-primary/20 to-blue-500/20 text-primary border border-primary/20 dark:border-primary/30">
+                    <Zap className="h-3 w-3 ml-1" />
+                    AI Bot
+                  </Badge>
+                </div>
+                <span className="text-xs text-muted-foreground hidden sm:block">مساعد واتساب الذكي</span>
+              </div>
             </div>
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-white/20 to-transparent pointer-events-none" />
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h1 className="font-bold text-xl bg-gradient-to-r from-primary via-purple-400 to-blue-400 bg-clip-text text-transparent transition-all duration-300">GX-MODY</h1>
-              <Badge variant="secondary" className="text-xs font-medium px-2 py-0.5 bg-gradient-to-r from-primary/20 to-blue-500/20 text-primary border border-primary/20 dark:border-primary/30">
-                <Zap className="h-3 w-3 ml-1" />
-                AI Bot
-              </Badge>
-            </div>
-            <span className="text-xs text-muted-foreground hidden sm:block">مساعد واتساب الذكي</span>
-          </div>
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-2">
+            <Link href="/support">
+              <Button 
+                variant={location === '/support' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                className="gap-2"
+              >
+                <Ticket className="h-4 w-4" />
+                <span>تذاكر الدعم</span>
+              </Button>
+            </Link>
+          </nav>
         </div>
 
         <div className="flex items-center gap-3">

@@ -1,3 +1,2 @@
-2025/12/21-22:34:42.330 827 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/Local Storage/leveldb/MANIFEST-000001
-2025/12/21-22:34:42.379 827 Recovering log #4
-2025/12/21-22:34:42.380 827 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/Local Storage/leveldb/000004.log 
+2025/12/21-22:40:54.621 c15 Creating DB /home/runner/workspace/.wwebjs_auth/session-default/Default/Local Storage/leveldb since it was missing.
+2025/12/21-22:40:54.876 c15 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/Local Storage/leveldb/MANIFEST-000001
