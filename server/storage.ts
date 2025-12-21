@@ -10,9 +10,11 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   
   // Support Tickets
-  createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  createSupportTicket(ticket: Partial<InsertSupportTicket>): Promise<SupportTicket>;
   getSupportTickets(): Promise<SupportTicket[]>;
+  getPendingTicket(phoneNumber: string): Promise<SupportTicket | undefined>;
   updateSupportTicket(id: number, update: Partial<SupportTicket>): Promise<SupportTicket>;
+  deleteTicket(id: number): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -42,15 +44,17 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async createSupportTicket(insertTicket: InsertSupportTicket): Promise<SupportTicket> {
+  async createSupportTicket(insertTicket: Partial<InsertSupportTicket>): Promise<SupportTicket> {
     const id = this.nextTicketId++;
     const ticket: SupportTicket = {
-      ...insertTicket,
-      id,
-      status: "open",
+      phoneNumber: insertTicket.phoneNumber!,
+      issue: insertTicket.issue || null,
+      status: insertTicket.status || "open",
       response: insertTicket.response || null,
+      id,
       createdAt: new Date(),
       updatedAt: new Date(),
+      expiresAt: (insertTicket as any).expiresAt || null,
     };
     this.tickets.set(id, ticket);
     return ticket;
@@ -60,12 +64,22 @@ export class MemStorage implements IStorage {
     return Array.from(this.tickets.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
+  async getPendingTicket(phoneNumber: string): Promise<SupportTicket | undefined> {
+    return Array.from(this.tickets.values()).find(
+      (t) => t.phoneNumber === phoneNumber && t.status === "pending"
+    );
+  }
+
   async updateSupportTicket(id: number, update: Partial<SupportTicket>): Promise<SupportTicket> {
     const ticket = this.tickets.get(id);
     if (!ticket) throw new Error("Ticket not found");
     const updatedTicket = { ...ticket, ...update, updatedAt: new Date() };
     this.tickets.set(id, updatedTicket);
     return updatedTicket;
+  }
+
+  async deleteTicket(id: number): Promise<void> {
+    this.tickets.delete(id);
   }
 }
 

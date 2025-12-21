@@ -69,6 +69,17 @@ export default function SupportPage() {
     replyMutation.mutate({ id, response: text });
   };
 
+  useEffect(() => {
+    const socket = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'tickets_update' || data.type === 'message') {
+        queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+      }
+    };
+    return () => socket.close();
+  }, []);
+
   return (
     <div className="flex flex-col h-screen w-full bg-background">
       <Header 

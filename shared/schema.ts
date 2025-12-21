@@ -405,16 +405,17 @@ export type VoiceSetting = typeof voiceSettings.$inferSelect;
 
 // ==================== SUPPORT TICKETS ====================
 
-export const ticketStatusEnum = pgEnum("ticket_status", ["open", "closed"]);
+export const ticketStatusEnum = pgEnum("ticket_status", ["pending", "open", "closed"]);
 
 export const supportTickets = pgTable("support_tickets", {
   id: serial("id").primaryKey(),
   phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
-  issue: text("issue").notNull(),
-  status: ticketStatusEnum("status").default("open").notNull(),
+  issue: text("issue"),
+  status: ticketStatusEnum("status").default("pending").notNull(),
   response: text("response"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
 });
 
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({

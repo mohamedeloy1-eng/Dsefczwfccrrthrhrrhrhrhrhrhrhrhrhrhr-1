@@ -153,27 +153,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return null;
     }
 
-    // Support Ticket Command: .دعم
-    if (message.body.startsWith('.دعم ')) {
-      const issue = message.body.slice(5).trim();
-      if (issue) {
-        try {
-          await storage.createSupportTicket({
-            phoneNumber: message.from,
-            issue: issue,
-            status: "open",
-            response: null
-          });
-          const successMsg = "✅ تم استلام تذكرتك بنجاح. سيقوم الدعم الفني بالرد عليك في أقرب وقت ممكن.";
-          const timestamp = Math.floor(Date.now() / 1000);
-          conversationStore.addMessage(message.from, successMsg, true, timestamp, sessionId);
-          broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
-          return successMsg;
-        } catch (err) {
-          console.error("Error creating ticket:", err);
-          return "❌ عذراً، فشل في إنشاء التذكرة. حاول مرة أخرى.";
-        }
+    // Support Ticket Logic
+    const pendingTicket = await storage.getPendingTicket(message.from);
+    
+    if (message.body.startsWith('/support') || message.body.startsWith('.ticket')) {
+      if (pendingTicket) {
+        await storage.deleteTicket(pendingTicket.id);
       }
+      
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+      await storage.createSupportTicket({
+        phoneNumber: message.from,
+        status: "pending",
+        expiresAt: expiresAt
+      });
+
+      const responseMsg = "🎫 تم فتح تذكرة دعم جديدة. الرجاء كتابة المشكلة التي تواجهك الآن.\n\n⚠️ ملاحظة: سيتم إرسال التذكرة تلقائياً بعد 5 دقائق إذا لم يتم الرد.";
+      const timestamp = Math.floor(Date.now() / 1000);
+      conversationStore.addMessage(message.from, responseMsg, true, timestamp, sessionId);
+      broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+      
+      // Auto-submit after 5 minutes
+      setTimeout(async () => {
+        const ticket = await storage.getPendingTicket(message.from);
+        if (ticket && ticket.status === "pending") {
+          await storage.updateSupportTicket(ticket.id, { status: "open" });
+          const timeoutMsg = "⏱️ انتهى وقت الانتظار. تم إرسال التذكرة بالمعلومات المتوفرة.";
+          whatsappService.sendMessage(message.from + '@c.us', timeoutMsg, sessionId);
+          broadcast({ type: 'tickets_update' });
+        }
+      }, 5 * 60 * 1000);
+
+      return responseMsg;
+    }
+
+    if (pendingTicket && pendingTicket.status === "pending") {
+      await storage.updateSupportTicket(pendingTicket.id, { 
+        issue: message.body,
+        status: "open"
+      });
+      
+      const successMsg = "✅ شكرًا لك. تم استلام تفاصيل المشكلة وتحويلها لفريق الدعم. سيتم الرد عليك قريباً.";
+      const timestamp = Math.floor(Date.now() / 1000);
+      conversationStore.addMessage(message.from, successMsg, true, timestamp, sessionId);
+      broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(message.from, sessionId) } });
+      broadcast({ type: 'tickets_update' });
+      return successMsg;
     }
 
     const user = userStore.getOrCreateUser(message.from, sessionId);
