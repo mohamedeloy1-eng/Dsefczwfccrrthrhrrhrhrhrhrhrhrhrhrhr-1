@@ -1,14 +1,19 @@
-2025/12/21-22:24:46.801 326 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/12/21-22:24:46.802 326 Recovering log #321
-2025/12/21-22:24:46.814 326 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000321.log 
-2025/12/21-22:24:46.814 326 Delete type=2 #311
-2025/12/21-22:24:46.815 326 Delete type=2 #312
-2025/12/21-22:24:46.815 326 Delete type=2 #313
-2025/12/21-22:24:46.815 326 Delete type=2 #314
-2025/12/21-22:24:46.815 326 Delete type=2 #315
-2025/12/21-22:24:46.815 326 Delete type=2 #316
-2025/12/21-22:24:46.815 326 Delete type=2 #317
-2025/12/21-22:24:46.815 326 Delete type=2 #318
-2025/12/21-22:24:46.815 326 Delete type=2 #319
-2025/12/21-22:24:46.815 326 Delete type=2 #322
-2025/12/21-22:24:47.532 318 Manual compaction at level-0 from '\x00(\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00)\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/21-22:32:30.926 671 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/21-22:32:30.926 671 Recovering log #333
+2025/12/21-22:32:30.957 671 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000333.log 
+2025/12/21-22:32:32.047 6c8 Level-0 table #346: started
+2025/12/21-22:32:32.085 6c8 Level-0 table #346: 150821 bytes OK
+2025/12/21-22:32:32.096 6c8 Delete type=0 #333
+2025/12/21-22:32:32.099 673 Manual compaction at level-0 from '\x00*\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00+\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/21-22:32:32.591 67a Compacting 1@1 + 9@2 files
+2025/12/21-22:32:32.831 67a Generated table #347@1: 49845 keys, 2209856 bytes
+2025/12/21-22:32:33.007 67a Generated table #348@1: 29992 keys, 2195418 bytes
+2025/12/21-22:32:33.105 67a Generated table #349@1: 2997 keys, 2166743 bytes
+2025/12/21-22:32:33.168 67a Generated table #350@1: 3596 keys, 2166501 bytes
+2025/12/21-22:32:33.781 67a Generated table #351@1: 3421 keys, 2164370 bytes
+2025/12/21-22:32:34.130 67a Generated table #352@1: 28192 keys, 2245423 bytes
+2025/12/21-22:32:34.420 67a Generated table #353@1: 29545 keys, 2254148 bytes
+2025/12/21-22:32:34.491 67a Generated table #354@1: 56548 keys, 2196813 bytes
+2025/12/21-22:32:34.644 67a Generated table #355@1: 86594 keys, 1906147 bytes
+2025/12/21-22:32:34.645 67a Compacted 1@1 + 9@2 files => 19505419 bytes
+2025/12/21-22:32:34.655 67a compacted to: files[ 0 0 9 0 0 0 0 ]

@@ -18,10 +18,16 @@ import { Loader2, MessageSquare, CheckCircle2, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import Header from "@/components/Header";
+import { useLocation } from "wouter";
 
 export default function SupportPage() {
+  const [location] = useLocation();
   const { data: tickets, isLoading } = useQuery<SupportTicket[]>({
     queryKey: ["/api/tickets"],
+  });
+
+  const { data: status } = useQuery({
+    queryKey: ["/api/status"],
   });
 
   const { toast } = useToast();
@@ -47,6 +53,16 @@ export default function SupportPage() {
     },
   });
 
+  const toggleConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const endpoint = status?.isConnected ? "/api/disconnect" : "/api/connect";
+      await apiRequest("POST", endpoint);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/status"] });
+    }
+  });
+
   const handleReply = (id: number) => {
     const text = replyText[id];
     if (!text?.trim()) return;
@@ -55,7 +71,10 @@ export default function SupportPage() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-background">
-      <Header />
+      <Header 
+        isConnected={!!status?.isConnected} 
+        onToggleConnection={() => toggleConnectionMutation.mutate()} 
+      />
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
