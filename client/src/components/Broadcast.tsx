@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Send, Loader2, CheckCircle } from "lucide-react";
@@ -21,6 +22,7 @@ export default function Broadcast() {
   const [sentCount, setSentCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [lastResult, setLastResult] = useState<{ success: number; failed: number } | null>(null);
+  const [manualPhoneNumber, setManualPhoneNumber] = useState("");
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -28,19 +30,34 @@ export default function Broadcast() {
 
   const broadcastMutation = useMutation({
     mutationFn: async (msg: string) => {
-      const activeUsers = users.filter(u => !u.isBlocked);
-      setTotalCount(activeUsers.length);
+      // Determine recipients
+      let recipients: string[] = [];
+      
+      if (manualPhoneNumber.trim()) {
+        // Use manual phone number if provided
+        recipients = [manualPhoneNumber.trim()];
+      } else {
+        // Use registered users
+        const activeUsers = users.filter(u => !u.isBlocked);
+        recipients = activeUsers.map(u => u.phoneNumber);
+      }
+
+      if (recipients.length === 0) {
+        throw new Error("لا توجد أرقام هواتف للإرسال إليها");
+      }
+
+      setTotalCount(recipients.length);
       setSentCount(0);
       setLastResult(null);
 
       let successCount = 0;
       let failedCount = 0;
 
-      for (let i = 0; i < activeUsers.length; i++) {
-        const user = activeUsers[i];
+      for (let i = 0; i < recipients.length; i++) {
+        const phoneNumber = recipients[i];
         try {
           const response = await apiRequest("POST", "/api/broadcast/send", {
-            phoneNumber: user.phoneNumber,
+            phoneNumber,
             message: msg,
           });
           const result = await response.json() as { success: boolean };
@@ -57,7 +74,7 @@ export default function Broadcast() {
         setSentCount(i + 1);
 
         // 5-second delay between messages
-        if (i < activeUsers.length - 1) {
+        if (i < recipients.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 5000));
         }
       }
@@ -93,10 +110,13 @@ export default function Broadcast() {
       return;
     }
 
-    if (users.filter(u => !u.isBlocked).length === 0) {
+    const activeUsers = users.filter(u => !u.isBlocked);
+    const hasManualNumber = manualPhoneNumber.trim().length > 0;
+
+    if (activeUsers.length === 0 && !hasManualNumber) {
       toast({
-        title: "لا مستخدمين",
-        description: "لا توجد مستخدمين نشطين للإرسال إليهم",
+        title: "تحذير",
+        description: "الرجاء إدخال رقم هاتف أو وجود مستخدمين مسجلين",
         variant: "destructive",
       });
       return;
@@ -128,6 +148,24 @@ export default function Broadcast() {
               عدد المستخدمين النشطين: <span className="font-bold">{activeUsers}</span> مستخدم
             </AlertDescription>
           </Alert>
+
+          {/* Manual Phone Number Input */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-foreground">
+              رقم هاتف محدد (اختياري)
+            </label>
+            <Input
+              placeholder="أدخل رقم الهاتف مثل: 20xxxxxxxxx"
+              value={manualPhoneNumber}
+              onChange={(e) => setManualPhoneNumber(e.target.value)}
+              disabled={isSending || usersLoading}
+              className="dark:bg-background/50 dark:border-white/10"
+              data-testid="input-manual-phone"
+            />
+            <p className="text-xs text-muted-foreground">
+              إذا أدخلت رقم هاتف، ستُرسل الرسالة إليه. وإلا ستُرسل لجميع المستخدمين المسجلين
+            </p>
+          </div>
 
           {/* Message Input */}
           <div className="space-y-3">
@@ -171,7 +209,7 @@ export default function Broadcast() {
           {/* Send Button */}
           <Button
             onClick={handleSendBroadcast}
-            disabled={isSending || usersLoading || activeUsers === 0}
+            disabled={isSending || usersLoading}
             className="w-full dark:bg-primary/80 dark:hover:bg-primary dark:text-white"
             size="lg"
             data-testid="button-send-broadcast"
