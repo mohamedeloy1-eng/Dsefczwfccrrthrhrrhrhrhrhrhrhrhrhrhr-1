@@ -1,19 +1,39 @@
-2025/12/21-22:32:30.926 671 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/12/21-22:32:30.926 671 Recovering log #333
-2025/12/21-22:32:30.957 671 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000333.log 
-2025/12/21-22:32:32.047 6c8 Level-0 table #346: started
-2025/12/21-22:32:32.085 6c8 Level-0 table #346: 150821 bytes OK
-2025/12/21-22:32:32.096 6c8 Delete type=0 #333
-2025/12/21-22:32:32.099 673 Manual compaction at level-0 from '\x00*\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00+\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/12/21-22:32:32.591 67a Compacting 1@1 + 9@2 files
-2025/12/21-22:32:32.831 67a Generated table #347@1: 49845 keys, 2209856 bytes
-2025/12/21-22:32:33.007 67a Generated table #348@1: 29992 keys, 2195418 bytes
-2025/12/21-22:32:33.105 67a Generated table #349@1: 2997 keys, 2166743 bytes
-2025/12/21-22:32:33.168 67a Generated table #350@1: 3596 keys, 2166501 bytes
-2025/12/21-22:32:33.781 67a Generated table #351@1: 3421 keys, 2164370 bytes
-2025/12/21-22:32:34.130 67a Generated table #352@1: 28192 keys, 2245423 bytes
-2025/12/21-22:32:34.420 67a Generated table #353@1: 29545 keys, 2254148 bytes
-2025/12/21-22:32:34.491 67a Generated table #354@1: 56548 keys, 2196813 bytes
-2025/12/21-22:32:34.644 67a Generated table #355@1: 86594 keys, 1906147 bytes
-2025/12/21-22:32:34.645 67a Compacted 1@1 + 9@2 files => 19505419 bytes
-2025/12/21-22:32:34.655 67a compacted to: files[ 0 0 9 0 0 0 0 ]
+2025/12/21-22:38:57.713 a4f Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/21-22:38:57.714 a4f Recovering log #368
+2025/12/21-22:38:57.738 a4f Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000368.log 
+2025/12/21-22:38:57.739 a4f Delete type=2 #358
+2025/12/21-22:38:57.739 a4f Delete type=2 #359
+2025/12/21-22:38:57.739 a4f Delete type=2 #360
+2025/12/21-22:38:57.739 a4f Delete type=2 #361
+2025/12/21-22:38:57.739 a4f Delete type=2 #362
+2025/12/21-22:38:57.739 a4f Delete type=2 #363
+2025/12/21-22:38:57.739 a4f Delete type=2 #364
+2025/12/21-22:38:57.739 a4f Delete type=2 #365
+2025/12/21-22:38:57.739 a4f Delete type=2 #366
+2025/12/21-22:38:57.739 a4f Delete type=2 #369
+2025/12/21-22:38:59.755 a59 Level-0 table #381: started
+2025/12/21-22:38:59.843 a59 Level-0 table #381: 350013 bytes OK
+2025/12/21-22:38:59.856 a59 Delete type=0 #368
+2025/12/21-22:38:59.860 a59 Manual compaction at level-0 from '\x00,\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00-\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/21-22:39:00.185 a4f Compacting 1@1 + 9@2 files
+2025/12/21-22:39:00.669 a4f Generated table #382@1: 56200 keys, 2221004 bytes
+2025/12/21-22:39:00.982 a4f Generated table #383@1: 32528 keys, 2195823 bytes
+2025/12/21-22:39:01.078 a4f Generated table #384@1: 2850 keys, 2165578 bytes
+2025/12/21-22:39:01.157 a4f Generated table #385@1: 3599 keys, 2165405 bytes
+2025/12/21-22:39:01.228 a4f Generated table #386@1: 3407 keys, 2164686 bytes
+2025/12/21-22:39:01.370 a4f Generated table #387@1: 25495 keys, 2229997 bytes
+2025/12/21-22:39:01.480 a4f Generated table #388@1: 30427 keys, 2257566 bytes
+2025/12/21-22:39:01.546 a4f Generated table #389@1: 43114 keys, 2190857 bytes
+2025/12/21-22:39:01.696 a4f Generated table #390@1: 102707 keys, 2253466 bytes
+2025/12/21-22:39:01.696 a4f Compacted 1@1 + 9@2 files => 19844382 bytes
+2025/12/21-22:39:01.705 a4f compacted to: files[ 0 0 9 0 0 0 0 ]
+2025/12/21-22:39:01.705 a4f Delete type=2 #370
+2025/12/21-22:39:01.706 a4f Delete type=2 #371
+2025/12/21-22:39:01.706 a4f Delete type=2 #372
+2025/12/21-22:39:01.706 a4f Delete type=2 #373
+2025/12/21-22:39:01.707 a4f Delete type=2 #374
+2025/12/21-22:39:01.707 a4f Delete type=2 #375
+2025/12/21-22:39:01.707 a4f Delete type=2 #376
+2025/12/21-22:39:01.707 a4f Delete type=2 #377
+2025/12/21-22:39:01.707 a4f Delete type=2 #378
+2025/12/21-22:39:01.707 a4f Delete type=2 #381

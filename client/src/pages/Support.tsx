@@ -26,7 +26,7 @@ export default function SupportPage() {
     queryKey: ["/api/tickets"],
   });
 
-  const { data: status } = useQuery({
+  const { data: status } = useQuery<any>({
     queryKey: ["/api/status"],
   });
 
