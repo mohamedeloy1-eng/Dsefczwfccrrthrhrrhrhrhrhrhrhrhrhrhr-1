@@ -12,10 +12,11 @@ import SecurityPanel from "@/components/SecurityPanel";
 import ContactsConversations from "@/components/ContactsConversations";
 import SessionMonitor from "@/components/SessionMonitor";
 import LinkedSessions from "@/components/LinkedSessions";
+import Broadcast from "@/components/Broadcast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageSquare, Settings, QrCode, Users, Shield, Contact, Activity, Link2, Loader2, Wifi, WifiOff, RefreshCw, X, AlertTriangle } from "lucide-react";
+import { MessageSquare, Settings, QrCode, Users, Shield, Contact, Activity, Link2, Loader2, Wifi, WifiOff, RefreshCw, X, AlertTriangle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
@@ -553,7 +554,7 @@ export default function Dashboard() {
         />
 
         <Tabs defaultValue="conversations" className="w-full animate-fade-in-up">
-          <TabsList className="grid w-full grid-cols-8 max-w-5xl dark:bg-card/60 dark:backdrop-blur-md dark:border-white/5">
+          <TabsList className="grid w-full grid-cols-9 max-w-6xl dark:bg-card/60 dark:backdrop-blur-md dark:border-white/5">
             <TabsTrigger value="conversations" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-conversations">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">المحادثات</span>
@@ -561,6 +562,10 @@ export default function Dashboard() {
             <TabsTrigger value="contacts" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-contacts">
               <Contact className="h-4 w-4" />
               <span className="hidden sm:inline">جهات الاتصال</span>
+            </TabsTrigger>
+            <TabsTrigger value="broadcast" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-broadcast">
+              <Send className="h-4 w-4" />
+              <span className="hidden sm:inline">بث</span>
             </TabsTrigger>
             <TabsTrigger value="sessions" className="gap-2 transition-all duration-200 data-[state=active]:dark:bg-primary/20 data-[state=active]:dark:text-primary" data-testid="tab-linked-sessions">
               <Link2 className="h-4 w-4" />
@@ -615,6 +620,10 @@ export default function Dashboard() {
 
           <TabsContent value="contacts" className="mt-6 animate-fade-in-up">
             <ContactsConversations />
+          </TabsContent>
+
+          <TabsContent value="broadcast" className="mt-6 animate-fade-in-up">
+            <Broadcast />
           </TabsContent>
 
           <TabsContent value="sessions" className="mt-6 animate-fade-in-up">

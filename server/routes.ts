@@ -1279,6 +1279,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success });
   });
 
+  // Broadcast API
+  app.post('/api/broadcast/send', async (req, res) => {
+    try {
+      const { phoneNumber, message, sessionId = 'default' } = req.body;
+      
+      if (!phoneNumber || !message) {
+        return res.status(400).json({ success: false, error: 'phoneNumber and message are required' });
+      }
+
+      const formattedNumber = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@c.us`;
+      const success = await whatsappService.sendMessage(formattedNumber, message, sessionId);
+      
+      if (success) {
+        logStore.logOutgoingMessage(phoneNumber, sessionId, message, 'text', 'success');
+        res.json({ success: true });
+      } else {
+        logStore.logError(phoneNumber, sessionId, 'Failed to send broadcast message');
+        res.json({ success: false, error: 'Failed to send message' });
+      }
+    } catch (error: any) {
+      console.error('Broadcast error:', error);
+      res.status(500).json({ success: false, error: error?.message || 'Failed to send broadcast' });
+    }
+  });
+
   // Connect message handlers for scheduled messages and reminders
   scheduledMessagesStore.setMessageHandler(async (phoneNumber, message, sessionId) => {
     return await whatsappService.sendMessage(phoneNumber, message, sessionId);
