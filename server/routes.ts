@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Support Ticket Logic
     const pendingTicket = await storage.getPendingTicket(message.from);
     
-    if (message.body.startsWith('/support') || message.body.startsWith('.ticket')) {
+    if (message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم')) {
       if (pendingTicket) {
         await storage.deleteTicket(pendingTicket.id);
       }
