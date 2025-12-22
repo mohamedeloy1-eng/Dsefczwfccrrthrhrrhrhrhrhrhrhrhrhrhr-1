@@ -1,58 +1,31 @@
-2025/12/21-23:42:20.398 431 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/12/21-23:42:20.398 431 Recovering log #523
-2025/12/21-23:42:20.446 431 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000523.log 
-2025/12/21-23:42:21.734 438 Level-0 table #537: started
-2025/12/21-23:42:21.786 438 Level-0 table #537: 542042 bytes OK
-2025/12/21-23:42:21.805 438 Delete type=0 #523
-2025/12/21-23:42:21.809 42f Manual compaction at level-0 from '\x00(\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00)\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/12/21-23:42:22.118 438 Compacting 1@1 + 10@2 files
-2025/12/21-23:42:22.218 438 Generated table #538@1: 55661 keys, 2217472 bytes
-2025/12/21-23:42:22.456 438 Generated table #539@1: 40276 keys, 2206100 bytes
-2025/12/21-23:42:22.550 438 Generated table #540@1: 2861 keys, 2169344 bytes
-2025/12/21-23:42:22.676 438 Generated table #541@1: 3422 keys, 2163704 bytes
-2025/12/21-23:42:22.768 438 Generated table #542@1: 3569 keys, 2165409 bytes
-2025/12/21-23:42:22.898 438 Generated table #543@1: 22005 keys, 2214523 bytes
-2025/12/21-23:42:23.050 438 Generated table #544@1: 26987 keys, 2263020 bytes
-2025/12/21-23:42:23.288 438 Generated table #545@1: 34767 keys, 2193465 bytes
-2025/12/21-23:42:23.454 438 Generated table #546@1: 105153 keys, 2256040 bytes
-2025/12/21-23:42:23.532 438 Generated table #547@1: 21335 keys, 470090 bytes
-2025/12/21-23:42:23.532 438 Compacted 1@1 + 10@2 files => 20319167 bytes
-2025/12/21-23:42:23.548 438 compacted to: files[ 0 0 10 0 0 0 0 ]
-2025/12/21-23:42:23.549 438 Delete type=2 #525
-2025/12/21-23:42:23.549 438 Delete type=2 #526
-2025/12/21-23:42:23.549 438 Delete type=2 #527
-2025/12/21-23:42:23.549 438 Delete type=2 #528
-2025/12/21-23:42:23.550 438 Delete type=2 #529
-2025/12/21-23:42:23.550 438 Delete type=2 #530
-2025/12/21-23:42:23.550 438 Delete type=2 #531
-2025/12/21-23:42:23.550 438 Delete type=2 #532
-2025/12/21-23:42:23.550 438 Delete type=2 #533
-2025/12/21-23:42:23.551 438 Delete type=2 #534
-2025/12/21-23:42:23.551 438 Delete type=2 #537
-2025/12/21-23:42:30.237 431 Level-0 table #549: started
-2025/12/21-23:42:30.310 431 Level-0 table #549: 1089402 bytes OK
-2025/12/21-23:42:30.321 431 Delete type=0 #536
-2025/12/21-23:42:30.591 431 Compacting 1@1 + 10@2 files
-2025/12/21-23:42:30.741 431 Generated table #550@1: 57097 keys, 2219525 bytes
-2025/12/21-23:42:30.854 431 Generated table #551@1: 40481 keys, 2206529 bytes
-2025/12/21-23:42:30.892 431 Generated table #552@1: 2869 keys, 2167347 bytes
-2025/12/21-23:42:30.935 431 Generated table #553@1: 3383 keys, 2164427 bytes
-2025/12/21-23:42:30.985 431 Generated table #554@1: 3565 keys, 2165315 bytes
-2025/12/21-23:42:31.087 431 Generated table #555@1: 20946 keys, 2211031 bytes
-2025/12/21-23:42:31.167 431 Generated table #556@1: 27129 keys, 2263543 bytes
-2025/12/21-23:42:31.232 431 Generated table #557@1: 27527 keys, 2186765 bytes
-2025/12/21-23:42:31.343 431 Generated table #558@1: 108485 keys, 2262103 bytes
-2025/12/21-23:42:31.878 431 Generated table #559@1: 26470 keys, 582757 bytes
-2025/12/21-23:42:31.878 431 Compacted 1@1 + 10@2 files => 20429342 bytes
-2025/12/21-23:42:31.902 431 compacted to: files[ 0 0 10 0 0 0 0 ]
-2025/12/21-23:42:31.902 431 Delete type=2 #538
-2025/12/21-23:42:31.903 431 Delete type=2 #539
-2025/12/21-23:42:31.903 431 Delete type=2 #540
-2025/12/21-23:42:31.903 431 Delete type=2 #541
-2025/12/21-23:42:31.903 431 Delete type=2 #542
-2025/12/21-23:42:31.903 431 Delete type=2 #543
-2025/12/21-23:42:31.904 431 Delete type=2 #544
-2025/12/21-23:42:31.904 431 Delete type=2 #545
-2025/12/21-23:42:31.904 431 Delete type=2 #546
-2025/12/21-23:42:31.904 431 Delete type=2 #547
-2025/12/21-23:42:31.904 431 Delete type=2 #549
+2025/12/22-00:04:00.821 6e1 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/22-00:04:00.823 6e1 Recovering log #548
+2025/12/22-00:04:00.859 6e1 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000548.log 
+2025/12/22-00:04:03.111 6df Level-0 table #562: started
+2025/12/22-00:04:03.141 6df Level-0 table #562: 331822 bytes OK
+2025/12/22-00:04:03.151 6df Delete type=0 #548
+2025/12/22-00:04:03.151 6df Manual compaction at level-0 from '\x00)\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00*\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/22-00:04:03.312 6df Compacting 1@1 + 10@2 files
+2025/12/22-00:04:03.537 6df Generated table #563@1: 57629 keys, 2221911 bytes
+2025/12/22-00:04:03.890 6df Generated table #564@1: 40484 keys, 2205165 bytes
+2025/12/22-00:04:04.269 6df Generated table #565@1: 2870 keys, 2167137 bytes
+2025/12/22-00:04:04.417 6df Generated table #566@1: 3382 keys, 2165042 bytes
+2025/12/22-00:04:04.611 6df Generated table #567@1: 3565 keys, 2164864 bytes
+2025/12/22-00:04:04.966 6df Generated table #568@1: 20911 keys, 2210784 bytes
+2025/12/22-00:04:06.307 6df Generated table #569@1: 27145 keys, 2263626 bytes
+2025/12/22-00:04:06.559 6df Generated table #570@1: 27549 keys, 2189423 bytes
+2025/12/22-00:04:06.716 6df Generated table #571@1: 108485 keys, 2262103 bytes
+2025/12/22-00:04:06.797 6df Generated table #572@1: 26470 keys, 582757 bytes
+2025/12/22-00:04:06.797 6df Compacted 1@1 + 10@2 files => 20432812 bytes
+2025/12/22-00:04:06.804 6df compacted to: files[ 0 0 10 0 0 0 0 ]
+2025/12/22-00:04:06.805 6df Delete type=2 #550
+2025/12/22-00:04:06.805 6df Delete type=2 #551
+2025/12/22-00:04:06.805 6df Delete type=2 #552
+2025/12/22-00:04:06.805 6df Delete type=2 #553
+2025/12/22-00:04:06.805 6df Delete type=2 #554
+2025/12/22-00:04:06.805 6df Delete type=2 #555
+2025/12/22-00:04:06.805 6df Delete type=2 #556
+2025/12/22-00:04:06.805 6df Delete type=2 #557
+2025/12/22-00:04:06.805 6df Delete type=2 #558
+2025/12/22-00:04:06.805 6df Delete type=2 #559
+2025/12/22-00:04:06.805 6df Delete type=2 #562
