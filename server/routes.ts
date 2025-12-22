@@ -157,9 +157,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const pendingTicket = await storage.getPendingTicket(message.from);
     
     const connectedNumber = whatsappService.getStatus(sessionId).connectedNumber;
-    const isOwner = message.from.includes(connectedNumber || 'NEVER_MATCH') || message.from === 'status@broadcast' || message.to === (connectedNumber + '@c.us');
+    // Check if the message is from the linked number or is an outgoing message (self-message)
+    const isOwner = message.isFromMe || (connectedNumber && message.from.includes(connectedNumber));
     
-    console.log(`Support Ticket Check - From: ${message.from}, To: ${message.to}, Connected: ${connectedNumber}, isOwner: ${isOwner}, Body: ${message.body}`);
+    console.log(`Support Ticket Check - From: ${message.from}, IsFromMe: ${message.isFromMe}, Connected: ${connectedNumber}, isOwner: ${isOwner}, Body: ${message.body}`);
     
     if ((message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم')) && isOwner) {
       if (pendingTicket) {
