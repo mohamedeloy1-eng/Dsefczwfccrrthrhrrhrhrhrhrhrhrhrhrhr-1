@@ -1,58 +1,31 @@
-2025/12/22-00:06:20.410 936 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/12/22-00:06:20.411 936 Recovering log #561
-2025/12/22-00:06:20.441 936 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000561.log 
-2025/12/22-00:06:21.287 934 Level-0 table #575: started
-2025/12/22-00:06:21.308 934 Level-0 table #575: 518417 bytes OK
-2025/12/22-00:06:21.317 934 Delete type=0 #561
-2025/12/22-00:06:21.318 936 Manual compaction at level-0 from '\x00*\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00+\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/12/22-00:06:21.515 93a Compacting 1@1 + 10@2 files
-2025/12/22-00:06:21.611 93a Generated table #576@1: 58751 keys, 2224693 bytes
-2025/12/22-00:06:21.705 93a Generated table #577@1: 40587 keys, 2204927 bytes
-2025/12/22-00:06:21.762 93a Generated table #578@1: 2873 keys, 2167600 bytes
-2025/12/22-00:06:21.848 93a Generated table #579@1: 3369 keys, 2164691 bytes
-2025/12/22-00:06:21.900 93a Generated table #580@1: 3551 keys, 2164625 bytes
-2025/12/22-00:06:21.982 93a Generated table #581@1: 20381 keys, 2209547 bytes
-2025/12/22-00:06:22.089 93a Generated table #582@1: 27283 keys, 2263501 bytes
-2025/12/22-00:06:22.166 93a Generated table #583@1: 26242 keys, 2187959 bytes
-2025/12/22-00:06:22.280 93a Generated table #584@1: 107832 keys, 2259683 bytes
-2025/12/22-00:06:22.316 93a Generated table #585@1: 28913 keys, 636346 bytes
-2025/12/22-00:06:22.316 93a Compacted 1@1 + 10@2 files => 20483572 bytes
-2025/12/22-00:06:22.323 93a compacted to: files[ 0 0 10 0 0 0 0 ]
-2025/12/22-00:06:22.323 93a Delete type=2 #563
-2025/12/22-00:06:22.323 93a Delete type=2 #564
-2025/12/22-00:06:22.323 93a Delete type=2 #565
-2025/12/22-00:06:22.324 93a Delete type=2 #566
-2025/12/22-00:06:22.324 93a Delete type=2 #567
-2025/12/22-00:06:22.324 93a Delete type=2 #568
-2025/12/22-00:06:22.324 93a Delete type=2 #569
-2025/12/22-00:06:22.324 93a Delete type=2 #570
-2025/12/22-00:06:22.324 93a Delete type=2 #571
-2025/12/22-00:06:22.324 93a Delete type=2 #572
-2025/12/22-00:06:22.324 93a Delete type=2 #575
-2025/12/22-00:21:44.482 93a Level-0 table #587: started
-2025/12/22-00:21:44.531 93a Level-0 table #587: 1554180 bytes OK
-2025/12/22-00:21:44.541 93a Delete type=0 #574
-2025/12/22-00:21:44.721 936 Compacting 1@1 + 10@2 files
-2025/12/22-00:21:44.797 936 Generated table #588@1: 61982 keys, 2229036 bytes
-2025/12/22-00:21:44.864 936 Generated table #589@1: 41025 keys, 2204391 bytes
-2025/12/22-00:21:44.901 936 Generated table #590@1: 2835 keys, 2167328 bytes
-2025/12/22-00:21:44.939 936 Generated table #591@1: 3333 keys, 2164535 bytes
-2025/12/22-00:21:44.975 936 Generated table #592@1: 3519 keys, 2163445 bytes
-2025/12/22-00:21:45.036 936 Generated table #593@1: 17026 keys, 2194030 bytes
-2025/12/22-00:21:45.117 936 Generated table #594@1: 27152 keys, 2264852 bytes
-2025/12/22-00:21:45.183 936 Generated table #595@1: 26896 keys, 2201439 bytes
-2025/12/22-00:21:45.258 936 Generated table #596@1: 95902 keys, 2246835 bytes
-2025/12/22-00:21:45.302 936 Generated table #597@1: 44574 keys, 978918 bytes
-2025/12/22-00:21:45.302 936 Compacted 1@1 + 10@2 files => 20814809 bytes
-2025/12/22-00:21:45.306 936 compacted to: files[ 0 0 10 0 0 0 0 ]
-2025/12/22-00:21:45.307 936 Delete type=2 #576
-2025/12/22-00:21:45.307 936 Delete type=2 #577
-2025/12/22-00:21:45.307 936 Delete type=2 #578
-2025/12/22-00:21:45.307 936 Delete type=2 #579
-2025/12/22-00:21:45.307 936 Delete type=2 #580
-2025/12/22-00:21:45.307 936 Delete type=2 #581
-2025/12/22-00:21:45.308 936 Delete type=2 #582
-2025/12/22-00:21:45.308 936 Delete type=2 #583
-2025/12/22-00:21:45.308 936 Delete type=2 #584
-2025/12/22-00:21:45.308 936 Delete type=2 #585
-2025/12/22-00:21:45.308 936 Delete type=2 #587
+2025/12/22-00:40:12.593 f20 Reusing MANIFEST /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/22-00:40:12.594 f20 Recovering log #586
+2025/12/22-00:40:12.606 f20 Reusing old log /home/runner/workspace/.wwebjs_auth/session-default/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000586.log 
+2025/12/22-00:40:13.707 faa Level-0 table #600: started
+2025/12/22-00:40:13.726 faa Level-0 table #600: 171233 bytes OK
+2025/12/22-00:40:13.734 faa Delete type=0 #586
+2025/12/22-00:40:13.736 f20 Manual compaction at level-0 from '\x00+\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00,\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/22-00:40:14.118 f20 Compacting 1@1 + 10@2 files
+2025/12/22-00:40:14.298 f20 Generated table #601@1: 62290 keys, 2228226 bytes
+2025/12/22-00:40:14.434 f20 Generated table #602@1: 40986 keys, 2205766 bytes
+2025/12/22-00:40:14.510 f20 Generated table #603@1: 2841 keys, 2167136 bytes
+2025/12/22-00:40:14.620 f20 Generated table #604@1: 3334 keys, 2164745 bytes
+2025/12/22-00:40:15.952 f20 Generated table #605@1: 3517 keys, 2163594 bytes
+2025/12/22-00:40:16.082 f20 Generated table #606@1: 17142 keys, 2195325 bytes
+2025/12/22-00:40:16.232 f20 Generated table #607@1: 27180 keys, 2264507 bytes
+2025/12/22-00:40:16.625 f20 Generated table #608@1: 26852 keys, 2201271 bytes
+2025/12/22-00:40:16.900 f20 Generated table #609@1: 96346 keys, 2247165 bytes
+2025/12/22-00:40:16.989 f20 Generated table #610@1: 44014 keys, 967041 bytes
+2025/12/22-00:40:16.990 f20 Compacted 1@1 + 10@2 files => 20804776 bytes
+2025/12/22-00:40:16.999 f20 compacted to: files[ 0 0 10 0 0 0 0 ]
+2025/12/22-00:40:17.001 f20 Delete type=2 #588
+2025/12/22-00:40:17.001 f20 Delete type=2 #589
+2025/12/22-00:40:17.001 f20 Delete type=2 #590
+2025/12/22-00:40:17.002 f20 Delete type=2 #591
+2025/12/22-00:40:17.003 f20 Delete type=2 #592
+2025/12/22-00:40:17.003 f20 Delete type=2 #593
+2025/12/22-00:40:17.003 f20 Delete type=2 #594
+2025/12/22-00:40:17.003 f20 Delete type=2 #595
+2025/12/22-00:40:17.003 f20 Delete type=2 #596
+2025/12/22-00:40:17.003 f20 Delete type=2 #597
+2025/12/22-00:40:17.003 f20 Delete type=2 #600
