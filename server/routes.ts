@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Support Ticket Logic
     const pendingTicket = await storage.getPendingTicket(message.from);
     
-    const isOwner = message.from === whatsappService.getConnectedNumber(sessionId);
+    const isOwner = message.from === (whatsappService.getStatus(sessionId).connectedNumber);
     
     if ((message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم')) && isOwner) {
       if (pendingTicket) {
