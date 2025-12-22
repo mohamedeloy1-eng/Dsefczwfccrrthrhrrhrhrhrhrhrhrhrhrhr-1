@@ -668,11 +668,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send to WhatsApp
       const sent = await whatsappService.sendMessage(ticket.phoneNumber + '@c.us', `🎫 *رد على تذكرة الدعم:*\n\n${response}\n\nتم إغلاق التذكرة.`);
       
+      // Also add to conversation history
+      const timestamp = Math.floor(Date.now() / 1000);
+      conversationStore.addMessage(ticket.phoneNumber, `🎫 *رد على تذكرة الدعم:*\n\n${response}\n\nتم إغلاق التذكرة.`, true, timestamp, 'default');
+      
       if (sent) {
         await storage.updateSupportTicket(id, { 
           response, 
           status: "closed" 
         });
+        broadcast({ type: 'tickets_update' });
+        broadcast({ type: 'message', data: { conversation: conversationStore.getConversation(ticket.phoneNumber, 'default') } });
         res.json({ success: true });
       } else {
         res.status(500).json({ error: "Failed to send WhatsApp message" });
