@@ -156,12 +156,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Support Ticket Logic - Only allow in private chats from bot owner
     const pendingTicket = await storage.getPendingTicket(message.from);
     
+    const connectedNumber = whatsappService.getStatus(sessionId).connectedNumber;
     // Check if it's a private chat (not a group)
     const isPrivateChat = !message.from.includes('@g.us');
-    // Support commands only work when bot owner sends from their connected device
-    const canAccessSupportCommands = isPrivateChat && message.isFromMe;
+    // Extract phone number from message.from (remove @c.us, @lid, etc)
+    const senderPhone = message.from.replace(/@.*/, '');
+    // Support commands only work when bot owner sends from their private chat
+    const isOwnerChat = connectedNumber && senderPhone === connectedNumber;
+    const canAccessSupportCommands = isPrivateChat && isOwnerChat;
     
-    console.log(`Support Ticket Check - From: ${message.from}, IsFromMe: ${message.isFromMe}, IsPrivateChat: ${isPrivateChat}, CanAccess: ${canAccessSupportCommands}, Body: ${message.body}`);
+    console.log(`Support Ticket Check - From: ${message.from}, SenderPhone: ${senderPhone}, ConnectedNumber: ${connectedNumber}, IsPrivateChat: ${isPrivateChat}, IsOwnerChat: ${isOwnerChat}, CanAccess: ${canAccessSupportCommands}, Body: ${message.body}`);
     
     if ((message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم')) && canAccessSupportCommands) {
       if (pendingTicket) {
