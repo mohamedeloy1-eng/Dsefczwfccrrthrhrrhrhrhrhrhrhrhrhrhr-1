@@ -157,12 +157,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const pendingTicket = await storage.getPendingTicket(message.from);
     
     const connectedNumber = whatsappService.getStatus(sessionId).connectedNumber;
-    // Check if the message is from the linked number or is an outgoing message (self-message)
+    // Check if the message is from a private chat (not a group) and from the linked number or self-message
+    const isPrivateChat = !message.from.includes('@g.us');
     const isOwner = message.isFromMe || (connectedNumber && message.from.includes(connectedNumber));
+    const canAccessSupportCommands = isPrivateChat && isOwner;
     
-    console.log(`Support Ticket Check - From: ${message.from}, IsFromMe: ${message.isFromMe}, Connected: ${connectedNumber}, isOwner: ${isOwner}, Body: ${message.body}`);
+    console.log(`Support Ticket Check - From: ${message.from}, IsFromMe: ${message.isFromMe}, Connected: ${connectedNumber}, IsPrivateChat: ${isPrivateChat}, IsOwner: ${isOwner}, Body: ${message.body}`);
     
-    if ((message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم')) && isOwner) {
+    if ((message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم')) && canAccessSupportCommands) {
       if (pendingTicket) {
         await storage.deleteTicket(pendingTicket.id);
       }
