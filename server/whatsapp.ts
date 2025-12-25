@@ -280,7 +280,8 @@ class WhatsAppSession extends EventEmitter {
 
       this.emit('message', whatsappMessage);
 
-      if (!message.fromMe && this.messageHandler) {
+      // Allow message handler for both incoming messages and messages from self (for support commands)
+      if (this.messageHandler) {
         try {
           const response = await this.messageHandler(whatsappMessage);
           if (response) {
@@ -742,7 +743,8 @@ class WhatsAppSession extends EventEmitter {
 
       this.emit('message', whatsappMessage);
 
-      if (!message.fromMe && this.messageHandler) {
+      // Allow message handler for both incoming messages and messages from self (for support commands)
+      if (this.messageHandler) {
         try {
           const response = await this.messageHandler(whatsappMessage);
           if (response) {
