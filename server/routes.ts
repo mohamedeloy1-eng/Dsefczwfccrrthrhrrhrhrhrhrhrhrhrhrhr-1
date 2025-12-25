@@ -162,12 +162,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const isPrivateChat = !message.from.includes('@g.us');
     // Extract phone number from message.from (remove @c.us, @lid, etc)
     const senderPhone = message.from.replace(/@.*/, '');
-    // Support commands only work when bot owner sends from their private chat
-    const isOwnerChat = connectedNumber && senderPhone === connectedNumber;
+    // Support commands work when:
+    // 1. Message is from the bot's own account (isFromMe), OR
+    // 2. Message is from the connected phone number
+    const isOwnerChat = message.isFromMe || (connectedNumber && senderPhone === connectedNumber);
     const canAccessSupportCommands = isPrivateChat && isOwnerChat;
     
     const isSupportCommand = message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم');
-    console.log(`Message received - From: ${message.from}, SenderPhone: ${senderPhone}, ConnectedNumber: ${connectedNumber}, IsPrivateChat: ${isPrivateChat}, IsOwnerChat: ${isOwnerChat}, IsSupportCommand: ${isSupportCommand}, Body: "${message.body}"`);
+    if (isSupportCommand || canAccessSupportCommands) {
+      console.log(`Support command detected - From: ${message.from}, SenderPhone: ${senderPhone}, ConnectedNumber: ${connectedNumber}, IsFromMe: ${message.isFromMe}, IsPrivateChat: ${isPrivateChat}, IsOwnerChat: ${isOwnerChat}, CanAccess: ${canAccessSupportCommands}, Body: "${message.body}"`);
+    }
     
     if (isSupportCommand && canAccessSupportCommands) {
       if (pendingTicket) {
