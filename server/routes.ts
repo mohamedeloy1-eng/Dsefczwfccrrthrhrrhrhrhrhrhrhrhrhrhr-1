@@ -163,9 +163,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const isSupportCommand = message.body.startsWith('/support') || message.body.startsWith('.ticket') || message.body.startsWith('.دعم');
     
-    console.log(`Message: "${message.body}" | From: ${message.from} | isFromMe: ${message.isFromMe} | isPrivateChat: ${isPrivateChat} | Support: ${isSupportCommand}`);
+    console.log(`Support Command Check - Body: "${message.body}" | IsFromMe: ${message.isFromMe} | IsSupportCmd: ${isSupportCommand} | CanAccess: ${canAccessSupportCommands}`);
     
     if (isSupportCommand && canAccessSupportCommands) {
+      console.log(`✅ Support command activated from ${message.from}`);
+      
       if (pendingTicket) {
         await storage.deleteTicket(pendingTicket.id);
       }
@@ -176,6 +178,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending",
         expiresAt: expiresAt
       });
+
+      console.log(`✅ Support ticket created for ${message.from}`);
+
+      // For messages from self, don't reply (isFromMe=true). Just create ticket.
+      if (message.isFromMe) {
+        return null;
+      }
 
       const responseMsg = "🎫 تم فتح تذكرة دعم جديدة. الرجاء كتابة المشكلة التي تواجهك الآن.\n\n⚠️ ملاحظة: سيتم إرسال التذكرة تلقائياً بعد 5 دقائق إذا لم يتم الرد.";
       const timestamp = Math.floor(Date.now() / 1000);
